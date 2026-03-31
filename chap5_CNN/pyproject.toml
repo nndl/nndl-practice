@@ -1,0 +1,15 @@
+[project]
+name = "chap5-cnn"
+version = "0.1.0"
+description = "Dependencies for chapter 5 CNN notebooks"
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "ipykernel>=6.29.5",
+    "matplotlib>=3.10.0",
+    "numpy>=1.26.0",
+    "pillow>=11.0.0",
+    "tensorflow==2.21.0",
+    "torch==2.10.0",
+    "torchvision==0.25.0",
+]
