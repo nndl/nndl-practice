@@ -1,43 +1,24 @@
-# 《神经网络与深度学习》课程练习
+# nndl-practice
 
-书籍信息：[神经网络与深度学习](https://nndl.github.io/)
+邱锡鹏《神经网络与深度学习：案例与实践》代码仓库。
 
-欢迎大家补充练习题目。
+| 目录 | 内容 |
+|---|---|
+| [`pytorch/`](pytorch/) | **案例与实践**（第 2 版印刷书配套）的 PyTorch 实现。开发中。 |
+| [`legacy/`](legacy/) | 原 `nndl/exercise` 仓库内容，对应**理论书第 1 版**的章末编程练习（numpy / 早期 PyTorch）。 |
 
-### 环境设定
-本次作业需要首先安装 anaconda3 下载地址 https://mirrors.tuna.tsinghua.edu.cn/anaconda/archive/ ， 
-pytorch >0.4
+PaddlePaddle 版（第一版印刷书指向）：[nndl/practice-in-paddle](https://github.com/nndl/practice-in-paddle)。
 
-## Exercise 
+## 系列与主站
 
-###  1. 热身练习 warmup
-numpy是Python中对于矩阵处理很实用的工具包，本小节作业主要是熟悉基本的numpy操作。
+- 主站：https://nndl.github.io
+- 理论书（v2）+ 通识版：https://github.com/nndl/nndl
+- 大模型与智能体：https://github.com/nndl/llm-agent
 
-### 2. 线性回归模型 Linear Regression
+## 元数据
 
-### 3. 线性模型
+[`_meta.yml`](_meta.yml) 是主站书目卡片的数据源；主站构建时由 [`aggregate-books.py`](https://github.com/nndl/nndl.github.io/blob/main/scripts/aggregate-books.py) 汇总。
 
-1. 支持向量机 support vector machine
-2. Softmax回归 Softmax Regression
+## 历史
 
-### 4. 前馈神经网络 Simple Neural Network
-
-利用numpy实现全连接神经网络
-
-### 5. 卷积神经网络 Convolutional Neural Network (CNN)
-利用卷积神经网络，处理MNIST 数据集分类问题。
-
-### 6. 循环神经网络 Recurrent Neural Network (RNN)
-基于循环神经网络的唐诗生成问题
-### 7. 注意力机制 Attention Mechanism
-
-1.  使用sequence to sequence 模型将一个字符串序列逆置。 
-2. 使用attentive sequence to sequence 模型将一个字符串序列逆置。
-
-### 11. 高斯混合模型 Gaussian Mixture Model
-
-### 12. 受限玻尔兹曼机 Restricted Boltzmann Machine (RBM)
-
-使用受限玻尔兹曼机（Restricted Boltzmann Machine, RBM），对MNIST 数据集建模。
-
-
+本仓库前身是 `nndl/exercise`（2017–2024 的"课程练习"仓库），2026 年改名为 `nndl-practice`，原章节全部归档到 [`legacy/`](legacy/)。改名后 GitHub 自动建立旧 URL `github.com/nndl/exercise/*` → 新 URL 的跳转，stars 和 forks 全部保留。
