@@ -21,9 +21,9 @@
 
 ## 题目要求： 
 
-补全程序，主要是前面的3个空和 生成诗歌的一段代码。(tensorflow)   [pytorch 需要补全 对应的 rnn.py 文件中的两处代码]
+补全 `poem_generation_pytorch.ipynb` 中模型部分的两处填空：`__init__` 中 `self.rnn_lstm` 的定义，以及 `forward` 中调用 LSTM 的一行。
 
-生成诗歌 开头词汇是 “ 日 、 红 、 山 、 夜 、 湖、 海 、 月 。
+生成诗歌 开头词汇是 “ 日 、 红 、 山 、 夜 、 湖、 海 、 月 ”。
 
 参考文献：
 

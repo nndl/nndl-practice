@@ -6,7 +6,6 @@
 
 ### 环境设定
 本次作业需要首先安装 anaconda3 下载地址 https://mirrors.tuna.tsinghua.edu.cn/anaconda/archive/ ， 
-tensorflow 2.0
 pytorch >0.4
 
 ## Exercise 
@@ -40,8 +39,5 @@ numpy是Python中对于矩阵处理很实用的工具包，本小节作业主要
 ### 12. 受限玻尔兹曼机 Restricted Boltzmann Machine (RBM)
 
 使用受限玻尔兹曼机（Restricted Boltzmann Machine, RBM），对MNIST 数据集建模。
-
-### 14. 深度强化学习 Deep Reinforcement Learning
-强化学习： 黑白棋
 
 

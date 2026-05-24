@@ -1,10 +1,9 @@
 
 作业主要内容：
-1.	补全程序，主要是前面的3个空和 生成诗歌的一段代码。(tensorflow)   [pytorCH 需要补全 对应的 rnn.py 文件中的两处代码]（pytorch 和 tensorflow 
-    两个版本中任意选择一个即可。）
+1.	补全 `poem_generation_pytorch.ipynb` 中 `PoemRNN` 的两处填空：`__init__` 中 `self.rnn_lstm` 的定义，以及 `forward` 中调用 LSTM 的一行。
 2.   解释一下 RNN ，LSTM，GRU模型，
 3.	叙述一下 这个诗歌生成的过程。
-4.	生成诗歌 开头词汇是 “ 日 、 红 、 山 、 夜 、 湖、 海 、 月 ” ，等词汇作为begin word,把生成的截图放到报告里面。[pytorch 版本 需要放一张 训练时候的截图。]
+4.	生成诗歌 开头词汇是 “ 日 、 红 、 山 、 夜 、 湖、 海 、 月 ” ，等词汇作为begin word,把生成的截图放到报告里面，并附一张训练时的截图。
 
 报告需要包含作业内容的 2、3、4部分和 试验的总结。
 

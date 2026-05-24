@@ -21,8 +21,6 @@
 
 ## 题目要求： 
 
-tensorflow版的卷积神经网路 conv2d() 和max_pool_2x2()函数，然后补全两层卷积的 8个空；
-
 pytorch版本的卷积神经网络 需要补齐  self.conv1 中 nn.Conv2d( )  和 self.conv2( ) 的参数，还需要填写 x = x.view( )中的内容。
 
-两个版本的训练精度都应该在 96% 以上。
+训练精度应该在 96% 以上。
