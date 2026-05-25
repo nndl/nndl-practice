@@ -1,0 +1,17 @@
+# PyTorch 章节运行环境
+# CPU 安装：pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+# GPU 安装：参见 https://pytorch.org/get-started/
+
+torch>=2.0
+torchvision>=0.15
+
+# 数据处理 / 绘图
+numpy>=1.24
+pandas>=2.0
+matplotlib>=3.7
+scikit-learn>=1.3       # iris 数据集（chap4 下）
+
+# Notebook 执行 / 测试
+jupyter>=1.0
+nbconvert>=7.0
+pytest>=7.0

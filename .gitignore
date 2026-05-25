@@ -1,3 +1,15 @@
 .ipynb_checkpoints
 .idea/
 
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Notebook runtime artifacts
+pytorch/**/models/
+
+# Local virtualenvs
+.venv/
+venv/
