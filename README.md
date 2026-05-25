@@ -11,6 +11,8 @@ PaddlePaddle 版（第一版印刷书指向）：[nndl/practice-in-paddle](https
 
 ## PyTorch 章节进度
 
+<!-- 与 pytorch/README.md 同步维护：状态变化时两边都要改 -->
+
 | 章 | 主题 | 状态 |
 |----|------|------|
 | 1  | [实践基础](pytorch/chap1实践基础/)             | 初版完成 |
