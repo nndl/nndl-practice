@@ -4,10 +4,25 @@
 
 | 目录 | 内容 |
 |---|---|
-| [`pytorch/`](pytorch/) | **案例与实践**（第 2 版印刷书配套）的 PyTorch 实现。开发中。 |
+| [`pytorch/`](pytorch/) | **案例与实践**（第 2 版印刷书配套）的 PyTorch 实现。8 章初版完成。 |
 | [`legacy/`](legacy/) | 原 `nndl/exercise` 仓库内容，对应**理论书第 1 版**的章末编程练习（numpy / 早期 PyTorch）。 |
 
 PaddlePaddle 版（第一版印刷书指向）：[nndl/practice-in-paddle](https://github.com/nndl/practice-in-paddle)。
+
+## PyTorch 章节进度
+
+| 章 | 主题 | 状态 |
+|----|------|------|
+| 1  | [实践基础](pytorch/chap1实践基础/)             | 初版完成 |
+| 2  | [机器学习概述](pytorch/chap2机器学习概述/)      | 初版完成 |
+| 3  | [线性模型](pytorch/chap3线性模型/)             | 初版完成（pilot） |
+| 4  | [前馈神经网络](pytorch/chap4前馈神经网络/)      | 初版完成 |
+| 5  | [卷积神经网络](pytorch/chap5卷积神经网络/)      | 初版完成 |
+| 6  | [循环神经网络](pytorch/chap6循环神经网络/)      | 初版完成 |
+| 7  | [网络优化与正则化](pytorch/chap7网络优化与正则化/) | 初版完成 |
+| 8  | [注意力机制](pytorch/chap8注意力机制/)          | 初版完成 |
+
+每章产出：可运行 notebook + README（实现要点）+ pytest sanity 测试。环境依赖见 [`pytorch/requirements.txt`](pytorch/requirements.txt)。
 
 ## 系列与主站
 
