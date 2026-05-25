@@ -14,7 +14,7 @@ class AdditiveAttention(nn.Module):
 
     def forward(self, H, mask):
         scores = self.v(torch.tanh(self.W(H))).squeeze(-1)
-        scores = scores.masked_fill(~mask, -1e9)
+        scores = scores.masked_fill(~mask, torch.finfo(scores.dtype).min)
         attn = F.softmax(scores, dim=-1)
         return torch.bmm(attn.unsqueeze(1), H).squeeze(1), attn
 
@@ -44,7 +44,7 @@ def _scaled_dot(Q, K, V, mask=None):
     d_k = Q.size(-1)
     scores = Q @ K.transpose(-2, -1) / math.sqrt(d_k)
     if mask is not None:
-        scores = scores.masked_fill(~mask, -1e9)
+        scores = scores.masked_fill(~mask, torch.finfo(scores.dtype).min)
     attn = F.softmax(scores, dim=-1)
     return attn @ V, attn
 
