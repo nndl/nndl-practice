@@ -16,18 +16,14 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 
 
-# ---- make_moons (notebook 中相同实现) ----
+# ---- make_moons：与 notebook 同一来源（sklearn 自带）----
+from sklearn.datasets import make_moons as _sk_make_moons
+
 def make_moons(n=400, noise=0.15, seed=0):
-    g = torch.Generator().manual_seed(seed)
-    n_a = n // 2; n_b = n - n_a
-    theta_a = math.pi * torch.rand(n_a, generator=g)
-    theta_b = math.pi * torch.rand(n_b, generator=g)
-    A = torch.stack([torch.cos(theta_a),     torch.sin(theta_a)],     dim=1)
-    B = torch.stack([1 - torch.cos(theta_b), 0.5 - torch.sin(theta_b)], dim=1)
-    X = torch.cat([A, B]) + noise * torch.randn(n, 2, generator=g)
-    y = torch.cat([torch.zeros(n_a), torch.ones(n_b)]).unsqueeze(1)
-    perm = torch.randperm(n, generator=g)
-    return X[perm], y[perm]
+    X_np, y_np = _sk_make_moons(n_samples=n, noise=noise, random_state=seed)
+    X = torch.tensor(X_np, dtype=torch.float32)
+    y = torch.tensor(y_np, dtype=torch.float32).unsqueeze(1)
+    return X, y
 
 
 def test_moons_mlp_high_accuracy():
