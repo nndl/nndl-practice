@@ -26,7 +26,7 @@ PaddlePaddle 版（第一版印刷书指向）：[nndl/practice-in-paddle](https
 
 ## 系列与主站
 
-- 主站：https://nndl.github.io
+- 主站：https://nndl.ai
 - 理论书（v2）+ 通识版：https://github.com/nndl/nndl
 - 大模型与智能体：https://github.com/nndl/llm-agent
 
