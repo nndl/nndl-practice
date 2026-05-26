@@ -9,6 +9,9 @@ __pycache__/
 
 # Notebook runtime artifacts
 pytorch/**/models/
+pytorch/**/checkpoint/
+pytorch/**/tinyshakespeare.txt
+pytorch/**/*.pt
 
 # Local virtualenvs
 .venv/
