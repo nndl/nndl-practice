@@ -15,7 +15,7 @@ PaddlePaddle 版（第一版印刷书指向）：[nndl/practice-in-paddle](https
 |----|------|------|
 | 1  | [实践基础](pytorch/chap1实践基础/)             | 初版完成 |
 | 2  | [机器学习概述](pytorch/chap2机器学习概述/)      | 初版完成 |
-| 3  | [线性模型](pytorch/chap3线性模型/)             | 初版完成（pilot） |
+| 3  | [线性模型](pytorch/chap3线性模型/)             | 初版完成 |
 | 4  | [前馈神经网络](pytorch/chap4前馈神经网络/)      | 初版完成 |
 | 5  | [卷积神经网络](pytorch/chap5卷积神经网络/)      | 初版完成 |
 | 6  | [循环神经网络](pytorch/chap6循环神经网络/)      | 初版完成 |
