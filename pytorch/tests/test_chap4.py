@@ -149,7 +149,7 @@ def test_runner_best_checkpoint_recoverable():
         # 训练结束的模型（可能已经退化）
         _, end_acc = runner._eval(dev_loader)
         # 加载 best.pt
-        model.load_state_dict(torch.load(str(best_path)))
+        model.load_state_dict(torch.load(str(best_path), weights_only=True))
         _, loaded_acc = runner._eval(dev_loader)
 
     assert loaded_acc >= end_acc - 1e-9, f"loaded best {loaded_acc} < end {end_acc}"

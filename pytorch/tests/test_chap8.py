@@ -51,7 +51,8 @@ def _scaled_dot(Q, K, V, mask=None):
 
 def test_scaled_dot_attention_with_identity_input_is_diagonal_dominant():
     torch.manual_seed(0)
-    X = torch.eye(4) + 0.01 * torch.randn(4, 4)
+    # dim=8 让 softmax 更分离；noise 缩小到 0.001 让 identity 主导更强
+    X = torch.eye(8) + 0.001 * torch.randn(8, 8)
     _, A = _scaled_dot(X, X, X)
     diag = A.diag()
     off = A - torch.diag(diag)

@@ -161,7 +161,7 @@ def test_state_dict_roundtrip():
         with torch.no_grad():
             assert not torch.allclose(model2(X), ref, atol=1e-4)
 
-        model2.load_state_dict(torch.load(p))
+        model2.load_state_dict(torch.load(p, weights_only=True))
         with torch.no_grad():
             assert torch.allclose(model2(X), ref)
 
