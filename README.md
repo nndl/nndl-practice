@@ -21,6 +21,8 @@ PaddlePaddle 版（第一版印刷书指向）：[nndl/practice-in-paddle](https
 | 6  | [循环神经网络](pytorch/chap6循环神经网络/)      | 初版完成 |
 | 7  | [网络优化与正则化](pytorch/chap7网络优化与正则化/) | 初版完成 |
 | 8  | [注意力机制](pytorch/chap8注意力机制/)          | 初版完成 |
+| 9  | [图神经网络](pytorch/chap9图神经网络/)          | 初版完成 |
+| 10 | [大语言模型与智能体](pytorch/chap10大语言模型与智能体/) | 初版完成 |
 
 每章产出：可运行 notebook + README（实现要点）+ pytest sanity 测试。环境依赖见 [`pytorch/requirements.txt`](pytorch/requirements.txt)。
 

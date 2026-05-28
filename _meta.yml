@@ -25,3 +25,5 @@ chapters:
   - { num: 6, title: 循环神经网络 }
   - { num: 7, title: 网络优化与正则化 }
   - { num: 8, title: 注意力机制 }
+  - { num: 9, title: 图神经网络 }
+  - { num: 10, title: 大语言模型与智能体 }
