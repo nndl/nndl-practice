@@ -1,13 +1,14 @@
 key: practice
 title: 神经网络与深度学习：案例与实践
-subtitle: 实践篇
+subtitle: 实践篇（第二版）
 short_title: 案例与实践
-cover: /assets/covers/nndl-practice-cover.jpg
+cover: /assets/covers/nndl-practice-cover2.png
+pdf: https://github.com/nndl/nndl-practice/releases/download/book-pdf/nndl-practice.pdf
 url: /nndl-practice/
 blurb: 配套理论书的实战教程，覆盖经典模型与典型任务的端到端案例。提供 PyTorch 与 PaddlePaddle 两套实现。
-authors: 邱锡鹏、飞桨教材编写组
+authors: 邱锡鹏
 publisher: 机械工业出版社
-year: 2023
+year: 2026
 status: published
 repo: https://github.com/nndl/nndl-practice
 douban:
