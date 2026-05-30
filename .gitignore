@@ -25,3 +25,7 @@ pytorch/datasets/bert-base-chinese/
 pytorch/datasets/boston_house_prices.csv
 pytorch/datasets/*.tar.gz
 pytorch/datasets/_*_extract/
+
+# Local notebook migration/runtime scratch
+pytorch/**/scripts/_tmp/
+pytorch/**/data/
