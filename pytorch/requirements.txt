@@ -1,9 +1,10 @@
 # PyTorch 章节运行环境
+# 需要 Python 3.11+（64-bit）与 pip 25+
 # CPU 安装：pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
-# GPU 安装：参见 https://pytorch.org/get-started/
+# GPU 安装：CUDA 12.6+，参见 https://pytorch.org/get-started/
 
-torch>=2.0
-torchvision>=0.15
+torch>=2.7
+torchvision>=0.22
 
 # 数据处理 / 绘图
 numpy>=1.24

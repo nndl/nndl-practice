@@ -51,7 +51,7 @@ jupyter nbconvert --to notebook --execute \
     --output /tmp/out.ipynb --ExecutePreprocessor.timeout=600
 ```
 
-> **数据集**：chap5（MNIST / CIFAR-10）首次运行会通过 `torchvision.datasets` 自动下载到 `~/.cache/torch_data`（约 200 MB），后续 run 直接读缓存。chap4 下的 iris 由 `sklearn.datasets.load_iris` 内置，不联网。波士顿房价的 CSV 已提交到 [`dataset/boston_house_prices.csv`](dataset/boston_house_prices.csv)。
+> **数据集**：chap2 下的加州房价由 `sklearn.datasets.fetch_california_housing` 获取并缓存在本机 scikit-learn 数据目录；chap4 下的 iris 由 `sklearn.datasets.load_iris` 内置，不联网。chap5（MNIST / CIFAR-10）首次运行会通过 `torchvision.datasets` 自动下载到 `~/.cache/torch_data`（约 200 MB），后续 run 直接读缓存。
 
 ## 跑测试
 

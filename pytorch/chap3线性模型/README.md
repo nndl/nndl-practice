@@ -2,13 +2,14 @@
 
 | Notebook | 内容 |
 |---|---|
-| [`线性模型-上.ipynb`](线性模型-上.ipynb) | 一元 / 多元线性回归：合成数据 + 闭式解 + 手写梯度下降 + `nn.Linear` 训练 |
-| [`线性模型-下.ipynb`](线性模型-下.ipynb) | Logistic 回归（二分类）与 Softmax 回归（多分类）+ 决策边界可视化 |
+| [`线性模型-上.ipynb`](线性模型-上.ipynb) | Logistic 回归二分类：Moon1000 合成数据 + 手写 `Model_LR` + `BinaryCrossEntropyLoss` + `SimpleBatchGD` + 决策边界可视化 |
+| [`线性模型-下.ipynb`](线性模型-下.ipynb) | Softmax 回归多分类：先用 Multi1000 三簇合成数据演示，再做鸢尾花 Iris 分类实战 |
 
 ## 实现要点
 
-- **数值稳定的 loss**：二分类用 `BCEWithLogitsLoss`、多分类用 `CrossEntropyLoss`；它们在内部分别做 sigmoid+BCE、log_softmax+NLL，模型最后一层**只输出 logits**，不要再叠 sigmoid / softmax。
-- **闭式解 vs 梯度下降**：在合成数据上两种方法的最终参数应接近一致；`tests/test_chap3.py` 里有相应断言。
+- **自定义 Op 算子风格**：延续第 1、2 章的 `Op` 接口手写 `Model_LR` / `Model_SR`，sigmoid / softmax 放在模型 forward 里；`backward(labels)` 直接给出 BCE+sigmoid / CE+softmax 的合成梯度——绕过自动求导，把反向传播讲透。
+- **数值稳定**：Softmax 减最大值避免 `exp` 上溢/下溢；`BinaryCrossEntropyLoss` / `MultiCrossEntropyLoss` 把概率 `clamp` 到 `(eps, 1-eps)` 避免 `log(0)`。
+- **`RunnerV2` 引入早停法**：训练时同时跑验证集，保留 dev 上最优的 `model.params` 字典；本章全程用 `SimpleBatchGD` 全批量梯度下降，不再是闭式解。
 - **可视化决策边界**：用 `torch.meshgrid(..., indexing='xy')` 生成网格点，`contourf` 画概率/区域。
 
 ## 测试

@@ -1,6 +1,6 @@
 # Legacy 练习（理论书）
 
-本目录是原 `nndl/exercise` 仓库的全部内容，对应**理论书第 1 版**的章末编程练习（numpy / PyTorch 入门级实现）。仓库更名为 `nndl-practice` 后，这些章节归档于此，便于历史链接与 fork 用户访问。
+本目录是原 `nndl/exercise` 仓库的全部内容，对应**理论书第一版**的章末编程练习（numpy / PyTorch 入门级实现）。仓库更名为 `nndl-practice` 后，这些章节归档于此，便于历史链接与 fork 用户访问。
 
 ## 章节
 
@@ -19,4 +19,4 @@
 
 ## 当前推荐入口
 
-案例与实践（**第 2 版印刷书配套**）的 PyTorch 实现在 [`../pytorch/`](../pytorch/)。
+案例与实践（**第二版印刷书配套**）的 PyTorch 实现在 [`../pytorch/`](../pytorch/)。

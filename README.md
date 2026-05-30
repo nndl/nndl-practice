@@ -4,8 +4,8 @@
 
 | 目录 | 内容 |
 |---|---|
-| [`pytorch/`](pytorch/) | **案例与实践**（第 2 版印刷书配套）的 PyTorch 实现。8 章初版完成。 |
-| [`legacy/`](legacy/) | 原 `nndl/exercise` 仓库内容，对应**理论书第 1 版**的章末编程练习（numpy / 早期 PyTorch）。 |
+| [`pytorch/`](pytorch/) | **案例与实践**（第二版印刷书配套）的 PyTorch 实现。10 章初版完成。 |
+| [`legacy/`](legacy/) | 原 `nndl/exercise` 仓库内容，对应**理论书第一版**的章末编程练习（numpy / 早期 PyTorch）。 |
 
 PaddlePaddle 版（第一版印刷书指向）：[nndl/practice-in-paddle](https://github.com/nndl/practice-in-paddle)。
 

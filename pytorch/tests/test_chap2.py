@@ -3,14 +3,15 @@
 覆盖：
 - 多项式回归闭式解：M=3 在 sin 上能拟合到位
 - L2 正则在 M=8 上能改善测试误差
-- Runner.fit() 能让训练损失下降
+- RunnerV1 把闭式解 + 评估 + save/load 串成一条流水线
 """
 import math
+import tempfile
+from pathlib import Path
 
 import torch
-import torch.nn as nn
-import torch.optim as optim
-from torch.utils.data import DataLoader, TensorDataset
+
+from nndl.runner import RunnerV1
 
 
 # --------------------------- 多项式回归核心 --------------------------- #
@@ -58,53 +59,72 @@ def test_l2_improves_overfit_at_M8():
     assert mse_reg < mse_no, f"L2 reg should help on M=8: no={mse_no}  reg={mse_reg}"
 
 
-# ----------------------------- Runner -------------------------------- #
-class Runner:
-    """与 notebook 中 Runner 类的最小镜像，便于独立测试。"""
-    def __init__(self, model, optimizer, loss_fn, metric_fn=None):
-        self.model, self.optimizer, self.loss_fn = model, optimizer, loss_fn
-        self.metric_fn = metric_fn
+# ----------------------------- RunnerV1 -------------------------------- #
+class _Linear:
+    """与 notebook 中 Linear 算子结构等价的最小镜像。"""
+    def __init__(self, input_size):
+        self.params = {
+            'w': torch.zeros(input_size, 1),
+            'b': torch.zeros(1),
+        }
 
-    def fit(self, train_loader, num_epochs=20):
-        history = []
-        for _ in range(num_epochs):
-            self.model.train()
-            running, n = 0.0, 0
-            for x, y in train_loader:
-                self.optimizer.zero_grad()
-                loss = self.loss_fn(self.model(x), y)
-                loss.backward()
-                self.optimizer.step()
-                running += loss.item() * x.size(0)
-                n += x.size(0)
-            history.append(running / n)
-        return history
-
-    @torch.no_grad()
-    def evaluate(self, loader):
-        self.model.eval()
-        fn = self.metric_fn or self.loss_fn
-        total, n = 0.0, 0
-        for x, y in loader:
-            total += fn(self.model(x), y).item() * x.size(0)
-            n += x.size(0)
-        return total / n
+    def __call__(self, X):
+        return X @ self.params['w'] + self.params['b']
 
 
-def test_runner_reduces_loss():
+def _optimizer_lsm(model, X, y, reg_lambda=0.0):
+    D = X.shape[1]
+    x_bar = X.mean(dim=0, keepdim=True)
+    y_bar = y.mean()
+    x_sub = X - x_bar
+    A = x_sub.T @ x_sub + reg_lambda * torch.eye(D)
+    rhs = x_sub.T @ (y - y_bar)
+    w = torch.linalg.solve(A, rhs)
+    b = y_bar - x_bar @ w
+    model.params['w'] = w
+    model.params['b'] = b.squeeze(0)
+
+
+def _mse(y_true, y_pred):
+    return ((y_true - y_pred) ** 2).mean()
+
+
+def test_runnerv1_closed_form_recovers_params():
+    """RunnerV1 求闭式解后能拿到与真值非常接近的 (w, b)。"""
+    torch.manual_seed(0)
+    N = 200
+    X = torch.linspace(-3, 3, N).unsqueeze(1)
+    true_w, true_b = 2.0, 1.0
+    y = true_w * X + true_b + 0.1 * torch.randn(N, 1)
+
+    runner = RunnerV1(_Linear(input_size=1), _optimizer_lsm)
+    runner.fit(X, y)
+    w = runner.model.params['w'].item()
+    b = runner.model.params['b'].item()
+    assert abs(w - true_w) < 0.05, f"w drift: {w} vs {true_w}"
+    assert abs(b - true_b) < 0.05, f"b drift: {b} vs {true_b}"
+
+
+def test_runnerv1_save_load_roundtrip():
+    """save → load 后评估结果一致。"""
     torch.manual_seed(0)
     N, D = 200, 4
     X = torch.randn(N, D)
-    true_w = torch.randn(D, 1)
-    y = X @ true_w + 0.1 * torch.randn(N, 1)
-    loader = DataLoader(TensorDataset(X, y), batch_size=32, shuffle=True)
+    y = X @ torch.randn(D, 1) + 0.1 * torch.randn(N, 1)
 
-    model = nn.Linear(D, 1)
-    runner = Runner(model, optim.Adam(model.parameters(), lr=0.05), nn.MSELoss())
-    history = runner.fit(loader, num_epochs=50)
+    runner = RunnerV1(_Linear(input_size=D), _optimizer_lsm)
+    runner.fit(X, y)
+    mse_before = runner.evaluate(X, y, _mse)
 
-    assert history[-1] < history[0] * 0.1, f"loss didn't drop: {history[0]} → {history[-1]}"
-    assert history[-1] < 0.1, f"final loss too high: {history[-1]}"
+    with tempfile.TemporaryDirectory() as td:
+        p = Path(td) / "linear.pt"
+        runner.save(p)
+
+        runner2 = RunnerV1(_Linear(input_size=D), _optimizer_lsm)
+        runner2.load(p)
+        mse_after = runner2.evaluate(X, y, _mse)
+
+    assert abs(mse_before - mse_after) < 1e-9, f"save/load drift: {mse_before} vs {mse_after}"
 
 
 if __name__ == "__main__":

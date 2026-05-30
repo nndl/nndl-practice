@@ -2,7 +2,7 @@
 
 覆盖：
 - moons 上 2-层 MLP 测试准确率 > 0.95
-- iris 上 RunnerV2 best-checkpoint 能恢复到比训练末尾更好（或相当）的 dev metric
+- iris 上 RunnerV3 best-checkpoint 能恢复到比训练末尾更好（或相当）的 dev metric
 - 手算反向梯度与 autograd 在 1e-6 量级一致
 """
 import math
@@ -14,6 +14,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
+
+from nndl.runner import RunnerV3
 
 
 # ---- make_moons：与 notebook 同一来源（sklearn 自带）----
@@ -81,41 +83,7 @@ def test_manual_backward_matches_autograd():
     assert (db2 - b2a.grad).abs().max().item() < 1e-6
 
 
-# ---- RunnerV2 best-model logic ----
-class RunnerV2:
-    def __init__(self, model, optimizer, loss_fn, metric_fn=None, higher_is_better=True):
-        self.model = model; self.optimizer = optimizer
-        self.loss_fn = loss_fn; self.metric_fn = metric_fn
-        self.higher_is_better = higher_is_better
-
-    def fit(self, train_loader, dev_loader, num_epochs, best_path):
-        best = -float('inf') if self.higher_is_better else float('inf')
-        for _ in range(num_epochs):
-            self.model.train()
-            for x, y in train_loader:
-                self.optimizer.zero_grad()
-                self.loss_fn(self.model(x), y).backward()
-                self.optimizer.step()
-            _, dev_m = self._eval(dev_loader)
-            if (dev_m > best) if self.higher_is_better else (dev_m < best):
-                best = dev_m
-                Path(best_path).parent.mkdir(parents=True, exist_ok=True)
-                torch.save(self.model.state_dict(), best_path)
-        return best
-
-    @torch.no_grad()
-    def _eval(self, loader):
-        self.model.eval()
-        total_loss, total_m, n = 0.0, 0.0, 0
-        for x, y in loader:
-            out = self.model(x)
-            total_loss += self.loss_fn(out, y).item() * x.size(0)
-            if self.metric_fn is not None:
-                total_m += self.metric_fn(out, y) * x.size(0)
-            n += x.size(0)
-        return total_loss / n, (total_m / n) if self.metric_fn else total_loss / n
-
-
+# ---- RunnerV3 best-model logic ----
 def test_runner_best_checkpoint_recoverable():
     """训练后加载 best.pt，其 dev metric 应当 >= 训练任一 epoch 末的 dev metric。"""
     from sklearn.datasets import load_iris
@@ -133,7 +101,7 @@ def test_runner_best_checkpoint_recoverable():
     dev_loader   = DataLoader(TensorDataset(Xdv, ydv), batch_size=32)
 
     model = nn.Sequential(nn.Linear(4, 16), nn.ReLU(), nn.Linear(16, 3))
-    runner = RunnerV2(
+    runner = RunnerV3(
         model, optim.Adam(model.parameters(), lr=0.01),
         nn.CrossEntropyLoss(),
         metric_fn=lambda l, y: (l.argmax(1) == y).float().mean().item(),
@@ -141,7 +109,9 @@ def test_runner_best_checkpoint_recoverable():
     )
     with tempfile.TemporaryDirectory() as td:
         best_path = Path(td) / "iris_best.pt"
-        best_observed = runner.fit(train_loader, dev_loader, num_epochs=80, best_path=str(best_path))
+        runner.fit(train_loader, dev_loader, num_epochs=80, log_every=200,
+                   best_path=str(best_path))
+        best_observed = max(runner.history["dev_metric"])
         # 训练结束的模型（可能已经退化）
         _, end_acc = runner._eval(dev_loader)
         # 加载 best.pt
