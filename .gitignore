@@ -16,3 +16,9 @@ pytorch/**/*.pt
 # Local virtualenvs
 .venv/
 venv/
+
+# Datasets（从 practice-in-paddle/dataset 复制；见 pytorch/datasets/README.md，数据不入库）
+pytorch/datasets/cifar-10-batches-py/
+pytorch/datasets/imdb/
+pytorch/datasets/lcqmc/
+pytorch/datasets/bert-base-chinese/
