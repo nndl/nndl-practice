@@ -22,3 +22,6 @@ pytorch/datasets/cifar-10-batches-py/
 pytorch/datasets/imdb/
 pytorch/datasets/lcqmc/
 pytorch/datasets/bert-base-chinese/
+pytorch/datasets/boston_house_prices.csv
+pytorch/datasets/*.tar.gz
+pytorch/datasets/_*_extract/
