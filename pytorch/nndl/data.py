@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import math
 
-import numpy as np
 import torch
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset
@@ -54,12 +53,21 @@ def make_moons(n_samples: int = 1000, shuffle: bool = True, noise=None, seed=Non
 # --------------------------------------------------------------------------- #
 def make_multiclass_classification(n_samples: int = 100, n_features: int = 2,
                                    n_classes: int = 3, shuffle: bool = True,
-                                   noise: float = 0.1, seed=None):
+                                   noise: float = 0.1, seed=None,
+                                   class_sep: float = 1.9,
+                                   cluster_std: float = 1.45,
+                                   label_noise: float = 0.0):
     """从 `n_classes` 个簇采样的多分类数据集。
 
     返回 `(X, y)`：`X` 形状 `[n_samples, n_features]`、`y` 形状 `[n_samples]`（long）。
+    `noise` 控制特征扰动，`label_noise` 控制误标比例。
     `seed` 非 None 时用局部 Generator，使采样 / 噪声 / shuffle 可复现（默认 None 走全局 RNG，行为同前）。
     """
+    if n_features < 1:
+        raise ValueError("n_features must be at least 1")
+    if n_classes < 2:
+        raise ValueError("n_classes must be at least 2")
+
     g = torch.Generator().manual_seed(seed) if seed is not None else None
     n_per_class = [n_samples // n_classes] * n_classes
     for i in range(n_samples - sum(n_per_class)):
@@ -68,26 +76,30 @@ def make_multiclass_classification(n_samples: int = 100, n_features: int = 2,
     X = torch.zeros(n_samples, n_features)
     y = torch.zeros(n_samples, dtype=torch.int64)
 
-    centroids = torch.randperm(2 ** n_features, generator=g)[:n_classes]
-    centroids_bin = np.unpackbits(centroids.numpy().astype("uint8")).reshape(-1, 8)[:, -n_features:]
-    centroids = torch.tensor(centroids_bin, dtype=torch.float32)
-    centroids = 1.5 * centroids - 1
-
-    X[:, :n_features] = torch.randn(n_samples, n_features, generator=g)
+    if n_features == 1:
+        centroids = torch.linspace(-class_sep, class_sep, n_classes).unsqueeze(1)
+    else:
+        angles = torch.linspace(0, 2 * math.pi, n_classes + 1)[:-1] + math.pi / 2
+        centroids = torch.zeros(n_classes, n_features)
+        centroids[:, 0] = class_sep * torch.cos(angles)
+        centroids[:, 1] = class_sep * torch.sin(angles)
 
     stop = 0
     for k, centroid in enumerate(centroids):
         start, stop = stop, stop + n_per_class[k]
-        y[start:stop] = k % n_classes
-        X_k = X[start:stop, :n_features]
-        A = 2 * torch.rand(n_features, n_features, generator=g) - 1
-        X_k = X_k @ A + centroid
-        X[start:stop, :n_features] = X_k
+        y[start:stop] = k
+        X[start:stop] = centroid + cluster_std * torch.randn(
+            n_per_class[k], n_features, generator=g)
 
     if noise > 0:
-        noise_mask = torch.rand(n_samples, generator=g) < noise
+        X = X + noise * torch.randn(n_samples, n_features, generator=g)
+    if label_noise > 0:
+        noise_mask = torch.rand(n_samples, generator=g) < label_noise
         n_noisy = int(noise_mask.sum())
-        y[noise_mask] = torch.randint(0, n_classes, (n_noisy,), generator=g)
+        if n_noisy > 0:
+            y[noise_mask] = (
+                y[noise_mask] + torch.randint(1, n_classes, (n_noisy,), generator=g)
+            ) % n_classes
     if shuffle:
         idx = torch.randperm(n_samples, generator=g)
         X = X[idx]; y = y[idx]

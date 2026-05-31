@@ -16,6 +16,7 @@ from nndl import (
     SimpleBatchGD,
     accuracy,
 )
+from nndl.data import make_multiclass_classification
 
 
 def _moons(n=400, noise=0.2, seed=0):
@@ -53,17 +54,14 @@ def test_logistic_regression_separates_moons():
 
 def _three_clusters(n_per=150, seed=0):
     """跟 chap3-下 notebook 演示的 3 簇 Multi1000 同构的合成数据。"""
-    torch.manual_seed(seed)
-    centers = [(0.0, 3.0), (-3.0, -2.0), (3.0, -2.0)]
-    Xs, ys = [], []
-    for k, (cx, cy) in enumerate(centers):
-        Xs.append(torch.randn(n_per, 2) + torch.tensor([cx, cy]))
-        ys.append(torch.full((n_per,), k, dtype=torch.long))
-    return torch.cat(Xs), torch.cat(ys)
+    return make_multiclass_classification(
+        n_samples=n_per * 3, n_features=2, n_classes=3,
+        noise=0.3, label_noise=0.03, seed=seed)
 
 
 def test_softmax_regression_separates_three_clusters():
     X, y = _three_clusters()
+    torch.manual_seed(0)
     model = Model_SR(input_size=2, output_size=3)
     optimizer = SimpleBatchGD(init_lr=0.1, model=model)
     loss_fn = MultiCrossEntropyLoss()
@@ -75,7 +73,7 @@ def test_softmax_regression_separates_three_clusters():
         optimizer.step()
 
     acc = accuracy(model(X), y)
-    assert acc > 0.9, f"Softmax 回归在三簇数据上准确率应 > 0.9，实际 {acc:.3f}"
+    assert acc > 0.85, f"Softmax 回归在三簇数据上准确率应 > 0.85，实际 {acc:.3f}"
 
 
 if __name__ == "__main__":
