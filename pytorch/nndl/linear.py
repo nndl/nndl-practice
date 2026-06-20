@@ -49,6 +49,12 @@ def optimizer_lsm(model: Linear, X, y, reg_lambda: float = 0.0):
     x_bar = X.mean(dim=0, keepdim=True)
     y_bar = y.mean()
     x_sub = X - x_bar
+    # 全 0 情况（如 M=0 的多项式特征）：中心化后特征恒为 0，回归退化为常数模型；
+    # 否则 XᵀX 奇异，torch.linalg.solve 会报错。与书/notebook 的实现保持一致。
+    if torch.all(x_sub == 0):
+        model.params["w"] = torch.zeros(D, 1)
+        model.params["b"] = y_bar.unsqueeze(0)
+        return model
     A = x_sub.T @ x_sub + reg_lambda * torch.eye(D, dtype=X.dtype, device=X.device)
     rhs = x_sub.T @ (y - y_bar)
     w = torch.linalg.solve(A, rhs)
