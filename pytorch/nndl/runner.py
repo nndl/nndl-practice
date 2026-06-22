@@ -151,7 +151,10 @@ class RunnerV3:
         self.loss_fn = loss_fn
         self.metric_fn = metric_fn
         self.higher_is_better = higher_is_better
-        self.history = {"train_loss": [], "dev_loss": [], "dev_metric": [], "lr": []}
+        # train_loss/dev_loss/dev_metric/lr 按 epoch 记录；train_step_loss 逐 iteration 记录
+        # （画细粒度训练损失曲线用，例如 IMDB BiLSTM 那张书图）。
+        self.history = {"train_loss": [], "dev_loss": [], "dev_metric": [], "lr": [],
+                        "train_step_loss": []}
 
     # ---- 内部工具：把 batch 里的张量搬到 self.device ------------------------ #
     def _to_device(self, batch):
@@ -191,6 +194,7 @@ class RunnerV3:
                 bs = inputs[0].size(0)
                 running += loss.item() * bs
                 n += bs
+                self.history["train_step_loss"].append(loss.item())
             train_loss = running / n
             self.history["train_loss"].append(train_loss)
             self.history["lr"].append(self.optimizer.param_groups[0]["lr"])
