@@ -1,0 +1,33 @@
+=== CELL 26 [code] ===
+def build_deep_mlp(init_kind, n_layers=10, dim=512, activation='relu'):
+    torch.manual_seed(0)
+    layers = []
+    for _ in range(n_layers):
+        layers.append(nn.Linear(dim, dim))
+        layers.append(nn.ReLU() if activation == 'relu' else nn.Tanh())
+    model = nn.Sequential(*layers)
+    for m in model.modules():
+        if isinstance(m, nn.Linear):
+            if init_kind == 'naive':
+                nn.init.normal_(m.weight, std=0.05)
+            elif init_kind == 'xavier':
+                nn.init.xavier_normal_(m.weight)
+            elif init_kind == 'kaiming':
+                nn.init.kaiming_normal_(m.weight, nonlinearity=activation)
+            nn.init.zeros_(m.bias)
+    return model
+
+def collect_std(model):
+    """Forward 一次，收集每个 Linear 层输出的标准差。"""
+    x = torch.randn(64, 512)
+    stds = []
+    with torch.no_grad():
+        for m in model:
+            x = m(x)
+            if isinstance(m, nn.Linear):
+                stds.append(x.std().item())
+    return stds
+
+for kind in ['naive', 'xavier', 'kaiming']:
+    stds = collect_std(build_deep_mlp(kind, activation='relu'))
+    print(f'{kind:8s} (ReLU):  ' + ', '.join(f'{s:7.3f}' for s in stds))

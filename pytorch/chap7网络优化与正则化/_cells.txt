@@ -1,0 +1,39 @@
+total cells: 38
+--- cell 0 [markdown] --- # 网络优化与正则化
+--- cell 1 [markdown] --- ## 1. 不同优化器在二维 loss 面上的轨迹
+--- cell 2 [code] --- import math
+--- cell 3 [markdown] --- **观察**：
+--- cell 4 [markdown] --- ### 教材版：带权 Sphere 函数上的逐个优化器轨迹
+--- cell 5 [code] --- # 教材“2D 可视化实验”所需的被优化函数、训练循环与可视化工具。
+--- cell 6 [code] --- # 梯度下降法：复用 nndl 的 SimpleBatchGD，对应图 fig:opti-vis-para
+--- cell 7 [code] --- class Adagrad(Optimizer):
+--- cell 8 [code] --- class RMSprop(Optimizer):
+--- cell 9 [code] --- class Momentum(Optimizer):
+--- cell 10 [code] --- class Adam(Optimizer):
+--- cell 11 [markdown] --- ### 教材版：不同优化器的3D可视化对比（鞍点）
+--- cell 12 [code] --- # 三维被优化函数：f(x)=x0²+x1²+x1³+x0·x1，(0,0) 附近是鞍点
+--- cell 13 [code] --- # 5 个模型分别配 5 个优化器，在同一函数上各跑 150 步，记录参数轨迹
+--- cell 14 [code] --- # 先把被优化函数的 3D 曲面绘出来，作为动画背景，对应图 opti-f-3d
+--- cell 15 [code] --- # 封装 Visualization3D：把 5 条参数轨迹叠成一段 3D 动画，对应图 7-15
+--- cell 16 [markdown] --- 从动画可以看到：在这个特定函数上，Momentum 利用历史动量绕开了鞍点，而其余几种优化器在150步内仍停留在鞍点附近。这只能说明 Momentum 在该函数上有优势，并不代表它是“最佳优化器”——具体任务里采用哪种优化器，仍要结合数据规模、损失曲面形态和工程预算综合权衡。
+--- cell 17 [markdown] --- ### 教材版：正则化的决策边界可视化（show_class_boundary）
+--- cell 18 [code] --- # 决策边界演示所需的算子：ReLU、单层线性、三层 MLP、带对率的交叉熵
+--- cell 19 [code] --- import matplotlib.pyplot as plt
+--- cell 20 [code] --- # 在合成 make_moons 上做一次轻量训练，再画决策边界（对应图 opti-regularization）
+--- cell 21 [markdown] --- ## 2. mini-batch 大小对收敛速度的影响
+--- cell 22 [code] --- import os
+--- cell 23 [code] --- from nndl import accuracy
+--- cell 24 [markdown] --- 小 batch 每个 epoch 走更多步（同样数据），所以收敛**早**——但 batch 太小时单步梯度方差大，最终精度不一定更好。Practical 选择常是 32-256。
+--- cell 25 [markdown] --- ## 3. 参数初始化：Xavier vs Kaiming
+--- cell 26 [code] --- def build_deep_mlp(init_kind, n_layers=10, dim=512, activation='relu'):
+--- cell 27 [markdown] --- **naive 高斯初始化** 让输出方差按 ~10x 速度衰减；**Xavier** 偏小（针对 tanh 设计）；**Kaiming** 在 ReLU 下能保持每层方差在同一量级。这就是深层 ReLU 网络默认用 Kaiming 的原因（PyTorch `nn.Linear`
+--- cell 28 [markdown] --- ## 4. BatchNorm 的训练加速效果
+--- cell 29 [code] --- class MLPNoBN(nn.Module):
+--- cell 30 [markdown] --- 在大学习率（`lr=0.1`）下，无 BN 的网络收敛慢甚至发散；BN 让它稳稳下降。这是 BN 最常被引用的好处。
+--- cell 31 [markdown] --- ## 5. Dropout 的正则化效果
+--- cell 32 [code] --- # 小数据：MNIST 1000 训练样本
+--- cell 33 [markdown] --- Dropout 让训练-测试准确率差距（generalization gap）变小，是经典正则化手段。注意 `model.eval()` 会自动关掉 dropout，所以 `runner.evaluate()` 不需要手动处理。
+--- cell 34 [markdown] --- ## 6. 学习率调度
+--- cell 35 [code] --- model = nn.Linear(2, 2)
+--- cell 36 [markdown] --- **典型使用模板**：
+--- cell 37 [markdown] --- ## 小结

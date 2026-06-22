@@ -1,0 +1,16 @@
+=== CELL 23 [code] ===
+from nndl import accuracy
+
+def train_with_bs(bs, epochs=3, lr=1e-3, seed=0):
+    torch.manual_seed(seed)
+    loader = DataLoader(train_set, batch_size=bs, shuffle=True)
+    model = LeNet5()
+    opt = optim.SGD(model.parameters(), lr=lr, momentum=0.9)
+    runner = RunnerV3(model, opt, nn.CrossEntropyLoss(),
+                      metric_fn=accuracy, higher_is_better=True)
+    runner.fit(loader, test_loader, num_epochs=epochs, log_every=None)
+    return runner.history['dev_metric']
+
+bs_accs = {bs: train_with_bs(bs) for bs in [16, 64, 256]}
+for bs, accs in bs_accs.items():
+    print(f'bs={bs:4d}  test_acc by epoch: ' + ', '.join(f'{a:.3f}' for a in accs))

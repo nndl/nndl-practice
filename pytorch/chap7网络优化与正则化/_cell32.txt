@@ -1,0 +1,46 @@
+=== CELL 32 [code] ===
+# 小数据：MNIST 1000 训练样本
+tiny_train = Subset(train_full, torch.randperm(len(train_full))[:1000].tolist())
+tiny_train_loader = DataLoader(tiny_train, batch_size=64, shuffle=True)
+
+
+class BigMLP(nn.Module):
+    def __init__(self, dropout=0.0):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(28*28, 256), nn.ReLU(), nn.Dropout(dropout),
+            nn.Linear(256,   256), nn.ReLU(), nn.Dropout(dropout),
+            nn.Linear(256,    10),
+        )
+    def forward(self, x): return self.net(x)
+
+
+def train_and_eval(model, epochs=15, lr=1e-2):
+    torch.manual_seed(0)
+    opt = optim.SGD(model.parameters(), lr=lr, momentum=0.9)
+    runner = RunnerV3(model, opt, nn.CrossEntropyLoss(),
+                      metric_fn=lambda out, y: (out.argmax(1) == y).float().mean().item(),
+                      higher_is_better=True)
+    train_acc, test_acc = [], []
+    # 每 epoch 在 train 与 test 上各 evaluate 一次，绘制泛化 gap 曲线
+    for _ in range(epochs):
+        runner.fit(tiny_train_loader, test_loader, num_epochs=1, log_every=None)
+        _, tr_a = runner.evaluate(tiny_train_loader)
+        train_acc.append(tr_a)
+        test_acc.append(runner.history['dev_metric'][-1])
+    return train_acc, test_acc
+
+
+tr_no, te_no = train_and_eval(BigMLP(dropout=0.0))
+tr_dp, te_dp = train_and_eval(BigMLP(dropout=0.5))
+
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
+ax1.plot(tr_no, '-o', label='train (no dropout)')
+ax1.plot(te_no, '-s', label='test  (no dropout)')
+ax1.set_title('No Dropout'); ax1.legend(); ax1.grid(alpha=0.3); ax1.set_xlabel('epoch')
+
+ax2.plot(tr_dp, '-o', label='train (dropout=0.5)')
+ax2.plot(te_dp, '-s', label='test  (dropout=0.5)')
+ax2.set_title('Dropout 0.5'); ax2.legend(); ax2.grid(alpha=0.3); ax2.set_xlabel('epoch')
+plt.tight_layout(); plt.show()

@@ -1,0 +1,23 @@
+=== CELL 20 [code] ===
+# 在合成 make_moons 上做一次轻量训练，再画决策边界（对应图 opti-regularization）
+torch.manual_seed(0)
+data_X, data_y = make_moons(n_samples=300, shuffle=True, noise=0.5)
+X_train, y_train = data_X[:200], data_y[:200].reshape([-1, 1])
+
+layers_size = [X_train.shape[1], 20, 3, 1]
+model = MLP_3L(layers_size)
+opt = MultiLayerGD(init_lr=0.2, model=model)
+loss_fn = BinaryCrossEntropyWithLogits(model)
+
+# tiny 训练：演示用只跑几十步（教材正式实验是 50000 步）
+for i in range(50):
+    logits = model(X_train)
+    loss = loss_fn(logits, y_train)
+    loss_fn.backward()
+    opt.step()
+
+print('训练集准确率：', accuracy_logits(model(X_train), y_train).numpy())
+
+plt.figure()
+show_class_boundary(model, X_train, y_train)
+plt.show()
