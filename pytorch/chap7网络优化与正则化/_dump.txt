@@ -1,0 +1,151 @@
+==== CELL 4 markdown ====
+### 教材版：带权 Sphere 函数上的逐个优化器轨迹
+
+上面用 Beale 函数把几个优化器画在同一张图上。这里换成教材《神经网络与深度学习：案例与实践》第 7 章“2D 可视化实验”的写法：被优化函数取带权 Sphere 函数 $f(x)=w^{\top}x^2$（取 $w=[0.2,\,2]$，让两个维度的曲率不同），每个优化器单独画一张“等值线 + 更新轨迹”图。配色用 `cmap='rainbow'`：颜色越偏蓝表示函数值越小（最小的 $0\sim 8$ 区间为深蓝），越偏红表示函数值越大；蓝色折线是参数更新轨迹，红色五角星标出最优点 $x^{*}=0$。
+
+==== CELL 5 code ====
+# 教材“2D 可视化实验”所需的被优化函数、训练循环与可视化工具。
+# 优化器基类 Op / Optimizer / SimpleBatchGD 直接复用 nndl 包。
+import sys, os
+sys.path.insert(0, os.path.abspath(os.path.join(os.getcwd(), os.pardir)))
+import torch
+import numpy as np
+import matplotlib.pyplot as plt
+from nndl import Op, Optimizer, SimpleBatchGD
+
+
+class OptimizedFunction(Op):
+    """被优化函数：带权 Sphere  f(x)=wᵀx²，对 x 的偏导为 2·w⊙x。"""
+
+    def __init__(self, w):
+        super().__init__()
+        self.w = w
+        self.params = {'x': 0}
+        self.grads = {'x': 0}
+
+    def forward(self, x):
+        self.params['x'] = x
+        return torch.matmul(self.w, torch.square(self.params['x']))
+
+    def backward(self):
+        self.grads['x'] = 2 * torch.mul(self.w, self.params['x'])
+
+
+def train_f(model, optimizer, x_init, epoch):
+    """最简训练循环，记录每一步更新前的参数位置。"""
+    x = x_init
+    all_x, losses = [], []
+    for i in range(epoch):
+        all_x.append(x.clone())          # clone 一份，避免后续原地更新影响已记录的轨迹点
+        loss = model(x)
+        losses.append(loss.item())
+        model.backward()
+        optimizer.step()
+        x = model.params['x']
+    return torch.stack(all_x), losses
+
+
+class Visualization:
+    def __init__(self):
+        # 只画参数 x1、x2 在区间 [-5, 5] 的部分
+        x1 = np.arange(-5, 5, 0.1)
+        x2 = np.arange(-5, 5, 0.1)
+        x1, x2 = np.meshgrid(x1, x2)
+        self.init_x = torch.tensor(np.array([x1, x2]), dtype=torch.float32)
+
+    def plot_2d(self, model, x):
+        """把函数等值线与优化轨迹画在同一张图上。"""
+        fig, ax = plt.subplots(figsize=(10, 6))
+        x1, x2 = self.init_x[0].numpy(), self.init_x[1].numpy()
+        # 网格上逐点的函数值，等价于对每个 (x1, x2) 求 f(x)=wᵀx²
+        z = (model.w[0] * self.init_x[0] ** 2 + model.w[1] * self.init_x[1] ** 2).numpy()
+        cp = ax.contourf(x1, x2, z, cmap='rainbow')
+        ax.contour(x1, x2, z, colors='black')
+        fig.colorbar(cp)
+        traj = x.detach().numpy()
+        ax.plot(traj[:, 0], traj[:, 1], '-o', color='b')   # 蓝色折线：参数更新轨迹
+        ax.plot(0, 0, 'r*', markersize=18)                  # 红色五角星：最优点
+        ax.set_xlabel('$x1$')
+        ax.set_ylabel('$x2$')
+        ax.set_xlim((-2, 5))
+        ax.set_ylim((-2, 5))
+
+
+def train_and_plot_f(model, optimizer, epoch):
+    """训练模型并可视化参数更新轨迹。"""
+    x_init = torch.tensor([3, 4], dtype=torch.float32)
+    print(f'x1 initiate: {x_init[0].numpy()}, x2 initiate: {x_init[1].numpy()}')
+    x, losses = train_f(model, optimizer, x_init, epoch)
+    Visualization().plot_2d(model, x)
+
+==== CELL 11 markdown ====
+### 教材版：不同优化器的3D可视化对比（鞍点）
+
+把上面的二维实验换到三维场景。被优化函数取 $f(x)=x_0^2+x_1^2+x_1^3+x_0\cdot x_1$，它在 $(0,0)$ 附近存在**鞍点**——既非极大值也非极小值的临界点。关注点是：不同优化器能否绕开鞍点继续向真正的最小值靠拢，对应教材图 opti-f-3d 与 7-15。下面复用本节已经定义好的 `SimpleBatchGD`、`Adagrad`、`RMSprop`、`Momentum`、`Adam` 五个优化器。
+
+<!-- MIGRATED-FROM-BOOK: 3d-saddle-and-decision-boundary -->
+
+==== CELL 12 code ====
+# 三维被优化函数：f(x)=x0⁴-2·x0²+x1²，(0,0) 是鞍点、(±1,0) 是两个真正的最小值
+# 继承 nndl 的 Op；backward 手动给出对 x0、x1 的偏导。
+class OptimizedFunction3D(Op):
+    def __init__(self):
+        super().__init__()
+        self.params = {'x': 0}
+        self.grads = {'x': 0}
+
+    def forward(self, x):
+        self.params['x'] = x
+        return x[0] ** 4 - 2 * x[0] ** 2 + x[1] ** 2
+
+    def backward(self):
+        x = self.params['x']
+        gradient1 = 4 * x[0] ** 3 - 4 * x[0]
+        gradient2 = 2 * x[1]
+        # 两个分量都是 0 维标量，用 torch.stack 拼成 1 维梯度向量
+        # （教材里写的 torch.cat 只接受 1 维张量，这里改成 stack）
+        self.grads['x'] = torch.stack([gradient1, gradient2])
+
+==== CELL 13 code ====
+# 5 个模型分别配 5 个优化器，在同一函数上各跑 150 步，记录参数轨迹
+model1 = OptimizedFunction3D()
+opt_gd = SimpleBatchGD(init_lr=0.01, model=model1)
+model2 = OptimizedFunction3D()
+opt_adagrad = Adagrad(init_lr=0.5, model=model2, epsilon=1e-7)
+model3 = OptimizedFunction3D()
+opt_rmsprop = RMSprop(init_lr=0.1, model=model3, beta=0.9, epsilon=1e-7)
+model4 = OptimizedFunction3D()
+opt_momentum = Momentum(init_lr=0.01, model=model4, rho=0.9)
+model5 = OptimizedFunction3D()
+opt_adam = Adam(init_lr=0.1, model=model5, beta1=0.9, beta2=0.99, epsilon=1e-7)
+
+models = [model1, model2, model3, model4, model5]
+opts = [opt_gd, opt_adagrad, opt_rmsprop, opt_momentum, opt_adam]
+
+x_all_opts, z_all_opts = [], []
+x_init = torch.tensor([0.2, 1.5], dtype=torch.float32)  # 从鞍点附近、右侧盆地一侧出发
+for model, opt in zip(models, opts):
+    x_one_opt, z_one_opt = train_f(model, opt, x_init, 150)   # 复用上面定义的 train_f
+    x_all_opts.append(x_one_opt.numpy())
+    z_all_opts.append(np.squeeze(z_one_opt))
+print('每个优化器的轨迹形状：', [a.shape for a in x_all_opts])
+
+==== CELL 14 code ====
+# 先把被优化函数的 3D 曲面绘出来，作为动画背景，对应图 opti-f-3d
+from mpl_toolkits.mplot3d import Axes3D  # noqa: F401  (注册 3d 投影)
+
+# 用 numpy.meshgrid 在 [-2, 2]×[-2, 2] 上以 0.1 为间隔生成网格
+x1 = np.arange(-2, 2, 0.1)
+x2 = np.arange(-2, 2, 0.1)
+x1, x2 = np.meshgrid(x1, x2)
+init_x = torch.tensor(np.array([x1, x2]), dtype=torch.float32)
+model = OptimizedFunction3D()
+
+fig = plt.figure()
+ax = plt.axes(projection='3d')
+# model(init_x) 返回 torch 张量，转成 numpy 再交给 plot_surface
+ax.plot_surface(init_x[0].numpy(), init_x[1].numpy(), model(init_x).numpy(), cmap='rainbow')
+ax.set_xlabel('x1')
+ax.set_ylabel('x2')
+ax.set_zlabel('f(x1,x2)')
+plt.show()
