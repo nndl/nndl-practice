@@ -1,9 +1,0 @@
-=== CELL 25 [markdown] ===
-## 3. 参数初始化：Xavier vs Kaiming
-
-目标：信号通过深网络后，每层的方差应当大致保持稳定（既不爆炸也不消失）。
-
-- **Xavier (`xavier_normal_`)**: 假设 tanh / sigmoid 这样的近线性激活，方差按 $2 / (n_\text{in} + n_\text{out})$ 缩放。
-- **Kaiming (`kaiming_normal_`)**: 假设 ReLU 类激活（一半被砍掉），方差按 $2 / n_\text{in}$ 缩放。
-
-下面构造一个 10 层的全连接网络，看不同初始化下每层输出的标准差。

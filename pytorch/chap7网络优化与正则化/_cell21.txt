@@ -1,4 +1,0 @@
-=== CELL 21 [markdown] ===
-## 2. mini-batch 大小对收敛速度的影响
-
-用 LeNet 在 MNIST 子集上，固定优化器、固定 lr，只改 batch_size。

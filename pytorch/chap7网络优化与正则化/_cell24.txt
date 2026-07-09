@@ -1,2 +1,0 @@
-=== CELL 24 [markdown] ===
-小 batch 每个 epoch 走更多步（同样数据），所以收敛**早**——但 batch 太小时单步梯度方差大，最终精度不一定更好。Practical 选择常是 32-256。
