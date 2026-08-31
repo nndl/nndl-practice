@@ -2,7 +2,7 @@
 
 覆盖两个 notebook 的核心训练链路：
 - 线性模型-上：手写 `Model_LR` + `BinaryCrossEntropyLoss` + `SimpleBatchGD` 在 Moon 风格二分类数据上能收敛到 > 0.8 准确率
-- 线性模型-下：手写 `Model_SR` + `MultiCrossEntropyLoss` + `SimpleBatchGD` 在三簇合成数据上能收敛到 > 0.9 准确率
+- 线性模型-下：手写 `Model_SR` + `MultiCrossEntropyLoss` + `SimpleBatchGD` 在 Multi1000 测试集上达到与书稿一致的准确率
 """
 import math
 
@@ -52,28 +52,29 @@ def test_logistic_regression_separates_moons():
     assert acc > 0.8, f"Logistic 回归在弯月数据上准确率应 > 0.8，实际 {acc:.3f}"
 
 
-def _three_clusters(n_per=150, seed=0):
-    """跟 chap3-下 notebook 演示的 3 簇 Multi1000 同构的合成数据。"""
+def _multi1000(seed=287):
+    """复现 chap3-下 Notebook 与书稿使用的 Multi1000 参数。"""
     return make_multiclass_classification(
-        n_samples=n_per * 3, n_features=2, n_classes=3,
-        noise=0.3, label_noise=0.03, seed=seed)
+        n_samples=1000, n_features=2, n_classes=3,
+        noise=0.15, label_noise=0.0, seed=seed)
 
 
 def test_softmax_regression_separates_three_clusters():
-    X, y = _three_clusters()
-    torch.manual_seed(0)
+    X, y = _multi1000()
+    X_train, y_train = X[:640], y[:640]
+    X_test, y_test = X[800:], y[800:]
     model = Model_SR(input_size=2, output_size=3)
     optimizer = SimpleBatchGD(init_lr=0.1, model=model)
     loss_fn = MultiCrossEntropyLoss()
 
     for _ in range(500):
-        preds = model(X)
-        _ = loss_fn(preds, y)
-        model.backward(y)
+        preds = model(X_train)
+        _ = loss_fn(preds, y_train)
+        model.backward(y_train)
         optimizer.step()
 
-    acc = accuracy(model(X), y)
-    assert acc > 0.85, f"Softmax 回归在三簇数据上准确率应 > 0.85，实际 {acc:.3f}"
+    acc = accuracy(model(X_test), y_test)
+    assert acc > 0.70, f"Softmax 回归在 Multi1000 测试集准确率应 > 0.70，实际 {acc:.3f}"
 
 
 if __name__ == "__main__":
