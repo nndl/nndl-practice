@@ -7,6 +7,7 @@
 """
 import math
 import tempfile
+import importlib.util
 from pathlib import Path
 
 import torch
@@ -16,6 +17,17 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 
 from nndl.runner import RunnerV3
+
+
+BOOK_CODE_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "chap4前馈神经网络"
+    / "book_code.py"
+)
+BOOK_CODE_SPEC = importlib.util.spec_from_file_location("chap4_book_code", BOOK_CODE_PATH)
+assert BOOK_CODE_SPEC is not None and BOOK_CODE_SPEC.loader is not None
+book_code = importlib.util.module_from_spec(BOOK_CODE_SPEC)
+BOOK_CODE_SPEC.loader.exec_module(book_code)
 
 
 # ---- make_moons：与 notebook 同一来源（sklearn 自带）----
@@ -81,6 +93,70 @@ def test_manual_backward_matches_autograd():
     assert (db1 - b1a.grad).abs().max().item() < 1e-6
     assert (dW2 - W2a.grad).abs().max().item() < 1e-6
     assert (db2 - b2a.grad).abs().max().item() < 1e-6
+
+
+def test_book_code_names_and_manual_update():
+    """书稿中的过渡类可直接导入，手写反向传播能更新两层参数。"""
+    expected_names = {
+        "Linear", "Logistic", "Model_MLP_L2", "BinaryCrossEntropyLoss",
+        "BatchGD", "RunnerV2_1", "Model_MLP_L2_V2", "RunnerV2_2",
+        "Model_MLP_L5",
+    }
+    assert all(hasattr(book_code, name) for name in expected_names)
+
+    torch.manual_seed(0)
+    X = torch.randn(8, 2)
+    y = (X[:, :1] > 0).float()
+    model = book_code.Model_MLP_L2(2, 5, 1)
+    loss_fn = book_code.BinaryCrossEntropyLoss(model)
+    optimizer = book_code.BatchGD(0.1, model)
+
+    before = model.fc1.params["W"].clone()
+    predicts = model(X)
+    loss = loss_fn(predicts, y)
+    loss_fn.backward()
+    optimizer.step()
+
+    assert predicts.shape == (8, 1)
+    assert torch.isfinite(loss)
+    assert model.fc1.grads["W"].shape == before.shape
+    assert not torch.equal(model.fc1.params["W"], before)
+
+    assert book_code.Model_MLP_L2_V2(2, 5, 1)(X).shape == (8, 1)
+    assert book_code.Model_MLP_L5(2, 1)(X).shape == (8, 1)
+
+
+def test_book_code_runners_save_checkpoints(tmp_path):
+    """书稿的手写算子版和 autograd 版 Runner 均可训练并保存模型。"""
+    torch.manual_seed(1)
+    X = torch.randn(12, 2)
+    y = (X[:, :1] > 0).float()
+    metric = lambda p, t: ((p >= 0.5) == t.bool()).float().mean().item()
+
+    manual_model = book_code.Model_MLP_L2(2, 4, 1)
+    manual_loss = book_code.BinaryCrossEntropyLoss(manual_model)
+    manual_runner = book_code.RunnerV2_1(
+        manual_model,
+        book_code.BatchGD(0.1, manual_model),
+        metric,
+        manual_loss,
+    )
+    manual_path = tmp_path / "manual" / "best.pt"
+    manual_runner.train([X, y], [X, y], num_epochs=2, log_epochs=None,
+                        save_path=manual_path)
+    assert manual_path.exists()
+
+    native_model = book_code.Model_MLP_L2_V2(2, 4, 1)
+    native_runner = book_code.RunnerV2_2(
+        native_model,
+        optim.SGD(native_model.parameters(), lr=0.1),
+        metric,
+        F.binary_cross_entropy,
+    )
+    native_path = tmp_path / "native" / "best.pt"
+    native_runner.train([X, y], [X, y], num_epochs=2, log_epochs=None,
+                        save_path=native_path)
+    assert native_path.exists()
 
 
 # ---- RunnerV3 best-model logic ----

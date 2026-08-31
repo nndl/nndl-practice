@@ -1,8 +1,36 @@
 """chap8 注意力机制 sanity tests."""
+import json
 import math
+from pathlib import Path
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+
+def test_lcqmc_padding_uses_truncated_sequence_length():
+    """截断后的批内最大长度不得重新被原始长样本撑大（Issue #32）。"""
+    notebook_path = (
+        Path(__file__).resolve().parents[1]
+        / "chap8注意力机制"
+        / "注意力机制-下.ipynb"
+    )
+    notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
+    source = "".join(
+        "".join(cell.get("source", []))
+        for cell in notebook["cells"]
+    )
+    assert "max_len = max(max_len, len(input_ids[-1]))" in source
+    assert "max_len = max(max_len, len(input_id))" not in source
+
+    max_seq_len = 4
+    raw_batch = [list(range(2)), list(range(10))]
+    input_ids = []
+    max_len = 0
+    for input_id in raw_batch:
+        input_ids.append(input_id[:max_seq_len])
+        max_len = max(max_len, len(input_ids[-1]))
+    assert max_len == max_seq_len
 
 
 # ---- AdditiveAttention ----
