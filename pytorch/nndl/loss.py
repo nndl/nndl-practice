@@ -12,9 +12,9 @@ from .op import Op
 
 
 def mean_squared_error(y_true, y_pred):
-    """均方误差。`y_true` 和 `y_pred` 形状一致。"""
+    """带 1/2 系数的均方误差，与第 2 章的损失定义保持一致。"""
     assert y_true.shape[0] == y_pred.shape[0]
-    return ((y_true - y_pred) ** 2).mean()
+    return 0.5 * ((y_true - y_pred) ** 2).mean()
 
 
 # 别名，跟 chap1/2 inline 习惯保持一致

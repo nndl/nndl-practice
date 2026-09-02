@@ -7,6 +7,8 @@
 
 数据集：`tinyshakespeare.txt` 由 notebook 自动从 karpathy/char-rnn 下载（约 1.1 MB），已加入 `.gitignore`。
 
+上篇默认按书中配置训练 1500 步。快速验证代码链路时，可先设置 `NNDL_QUICK_RUN=1`；此模式只训练 20 步、减少评估批次，并保留损失记录和阶段采样。
+
 ## 实现要点
 
 ### 上：nanoGPT 预训练与采样

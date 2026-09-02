@@ -101,7 +101,23 @@ def test_mce_loss():
 def test_mse():
     y_true = torch.tensor([1.0, 2.0, 3.0])
     y_pred = torch.tensor([1.0, 2.0, 4.0])
-    assert abs(nndl.mean_squared_error(y_true, y_pred).item() - 1.0 / 3) < 1e-6
+    assert abs(nndl.mean_squared_error(y_true, y_pred).item() - 1.0 / 6) < 1e-6
+
+
+def test_optimizer_lsm_handles_rank_deficient_features():
+    """重复特征列也应得到有效解，而不是报奇异矩阵错误。"""
+    X = torch.tensor([[1.0, 2.0], [2.0, 4.0], [3.0, 6.0]])
+    y = torch.tensor([[1.0], [2.0], [3.0]])
+    model = nndl.optimizer_lsm(nndl.Linear(2), X, y)
+    assert torch.allclose(model(X), y, atol=1e-5)
+
+
+def test_optimizer_lsm_preserves_dtype_for_constant_features():
+    X = torch.ones(3, 2, dtype=torch.float64)
+    y = torch.tensor([[1.0], [2.0], [3.0]], dtype=torch.float64)
+    model = nndl.optimizer_lsm(nndl.Linear(2), X, y)
+    assert model.params["w"].dtype == X.dtype
+    assert model(X).dtype == X.dtype
 
 
 # ---- Metric -------------------------------------------------------------- #

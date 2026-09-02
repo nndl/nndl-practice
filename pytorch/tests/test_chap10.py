@@ -5,7 +5,10 @@ NanoGPT 前向 + 损失、采样策略（top-k / top-p）、LoRALinear 初始等
 SFT 的 ignore_index、DPO 损失公式形状。
 """
 import copy
+import ast
+import json
 import math
+from pathlib import Path
 
 import torch
 import torch.nn as nn
@@ -309,6 +312,48 @@ def test_dpo_loss_is_zero_when_logits_large():
     logits = beta * 20.0                                       # 非常大
     loss = -F.logsigmoid(torch.tensor(logits)).item()
     assert loss < 1e-6
+
+
+def test_notebook_dpo_loss_keeps_policy_gradient():
+    """直接执行 notebook 中的 DPO 函数，防止 .item()/torch.tensor 再次截断梯度。"""
+    notebook_path = (
+        Path(__file__).resolve().parents[1]
+        / 'chap10大语言模型与智能体'
+        / '大语言模型与智能体-下.ipynb'
+    )
+    notebook = json.loads(notebook_path.read_text(encoding='utf-8'))
+    source = '\n'.join(
+        ''.join(cell.get('source', []))
+        for cell in notebook['cells']
+        if cell.get('cell_type') == 'code'
+    )
+    tree = ast.parse(source)
+    wanted = {'logprob_of_sequence', 'dpo_loss'}
+    definitions = [
+        node for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name in wanted
+    ]
+    assert {node.name for node in definitions} == wanted
+
+    namespace = {'torch': torch, 'F': F}
+    exec(compile(ast.Module(body=definitions, type_ignores=[]), str(notebook_path), 'exec'), namespace)
+    stoi = {ch: i for i, ch in enumerate('abc')}
+    namespace['encode'] = lambda text: torch.tensor([stoi[ch] for ch in text], dtype=torch.long)
+
+    torch.manual_seed(0)
+    policy = NanoGPT(vocab_size=3, block_size=4, n_layer=1, n_head=1, n_embd=8)
+    ref = copy.deepcopy(policy)
+    for parameter in ref.parameters():
+        parameter.requires_grad = False
+
+    loss = namespace['dpo_loss'](policy, ref, 'a', 'bc', 'cb')
+    assert loss.requires_grad
+    loss.backward()
+    assert any(
+        parameter.grad is not None and parameter.grad.abs().sum() > 0
+        for parameter in policy.parameters()
+    )
+    assert all(parameter.grad is None for parameter in ref.parameters())
 
 
 # ---- ReAct 解析 ----

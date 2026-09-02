@@ -259,4 +259,5 @@ class RunnerV3:
         torch.save(self.model.state_dict(), path)
 
     def load(self, path):
-        self.model.load_state_dict(torch.load(path, weights_only=True))
+        state = torch.load(path, weights_only=True, map_location=self.device)
+        self.model.load_state_dict(state)

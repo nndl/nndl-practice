@@ -115,7 +115,8 @@ class SinusoidalPE(nn.Module):
         pos = torch.arange(max_len).unsqueeze(1).float()
         div = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
         pe[:, 0::2] = torch.sin(pos * div)
-        pe[:, 1::2] = torch.cos(pos * div)
+        # d_model 为奇数时，奇数位比偶数位少一列。
+        pe[:, 1::2] = torch.cos(pos * div[:pe[:, 1::2].shape[1]])
         self.register_buffer("pe", pe)
 
     def forward(self, x):

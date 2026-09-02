@@ -4,6 +4,8 @@
 |---|---|
 | [`图神经网络.ipynb`](图神经网络.ipynb) | 从零纯 PyTorch 实现 GCN / GraphSAGE / GAT / GIN；Zachary's Karate Club 上 4 种 GNN 半监督节点分类对比；图级任务玩具数据集（分子图回归）；PyTorch Geometric 等价写法 |
 
+本章依赖 `networkx` 和 `torch-geometric`，二者已列入 [`../requirements.txt`](../requirements.txt)。按项目安装说明执行 `pip install -r pytorch/requirements.txt` 后即可运行全部单元格。
+
 ## 实现要点
 
 - **消息传递抽象**：所有 GNN 共享 `message → aggregate → update` 三步。`MessagePassing` 抽象基类把这三步独立出来，子类只重写需要的部分（mean aggregator 演示在基类上的最小实现）。

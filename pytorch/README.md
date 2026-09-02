@@ -16,7 +16,7 @@
 | torchvision | **0.22+** | chap5 用 `datasets.MNIST` / `CIFAR10` 自动下载 |
 | CUDA（可选） | 12.6+ | GPU 训练；CPU 也能跑完所有 notebook（chap5 / chap10 会慢一些） |
 
-完整依赖见 [`requirements.txt`](requirements.txt)：还包括 `numpy`、`pandas`、`matplotlib`、`scikit-learn`（chap4 下 iris）、`jupyter`、`pytest`。
+完整依赖见 [`requirements.txt`](requirements.txt)：还包括 `numpy`、`pandas`、`matplotlib`、`scikit-learn`（chap4 下 iris）、`networkx` 与 `torch-geometric`（chap9）、`jupyter`、`pytest`。
 
 ## 安装
 
@@ -52,6 +52,13 @@ jupyter nbconvert --to notebook --execute \
 ```
 
 > **数据集**：chap2 下的加州房价由 `sklearn.datasets.fetch_california_housing` 获取并缓存在本机 scikit-learn 数据目录；chap4 下的 iris 由 `sklearn.datasets.load_iris` 内置，不联网。chap5（MNIST / CIFAR-10）首次运行会通过 `torchvision.datasets` 自动下载到 `~/.cache/torch_data`（约 200 MB），后续 run 直接读缓存。
+
+chap10 上支持快速冒烟模式：把环境变量 `NNDL_QUICK_RUN` 设为 `1` 后，只训练 20 步并减少评估批次；不设置时仍使用书中的完整超参数。
+
+```powershell
+$env:NNDL_QUICK_RUN = '1'
+jupyter notebook pytorch/chap10大语言模型与智能体/大语言模型与智能体-上.ipynb
+```
 
 ## 跑测试
 

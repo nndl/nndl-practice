@@ -151,6 +151,15 @@ def test_sinusoidal_pe_first_columns_match_formula():
     assert torch.allclose(pe[0, 1::2], torch.ones(4), atol=1e-6)
 
 
+def test_sinusoidal_pe_accepts_odd_dimension():
+    from nndl import SinusoidalPE
+
+    pe = SinusoidalPE(d_model=3, max_len=5)
+    out = pe(torch.zeros(2, 5, 3))
+    assert out.shape == (2, 5, 3)
+    assert torch.isfinite(out).all()
+
+
 # ---- nn.TransformerEncoderLayer integration test ----
 def test_nn_transformer_encoder_runs():
     layer = nn.TransformerEncoderLayer(d_model=64, nhead=4, dim_feedforward=128,
