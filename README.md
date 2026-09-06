@@ -1,57 +1,23 @@
-# 神经网络与深度学习：案例与实践
+# 神经网络与深度学习：案例与实践（第二版）
 
-<p align="center"><strong>从张量和自动求导出发，亲手搭建模型与训练框架，再走到 Transformer、大语言模型和智能体。</strong></p>
+邱锡鹏著 · **用 PyTorch 从零实现关键算法，再把模型用到实际任务中**
 
-<p align="center">
-  <a href="https://nndl.ai/nndl-practice/">本书页面</a> ·
-  <a href="https://github.com/nndl/nndl-practice/releases/download/book-pdf/nndl-practice.pdf">下载 PDF</a> ·
-  <a href="#快速开始">快速开始</a> ·
-  <a href="#章节目录">章节目录</a> ·
-  <a href="https://github.com/nndl/nndl-practice/issues">勘误与建议</a>
-</p>
+[本书介绍](https://nndl.ai/nndl-practice/) · [下载 PDF](https://github.com/nndl/nndl-practice/releases/download/book-pdf/nndl-practice.pdf) · [快速开始](#快速开始) · [章节目录](#章节目录) · [勘误与建议](https://github.com/nndl/nndl-practice/issues)
 
 <table>
   <tr>
     <td width="30%" align="center" valign="top">
-      <img src="assets/covers/nndl-practice-cover.webp" alt="《神经网络与深度学习：案例与实践（第二版）》封面" width="250">
+      <img src="assets/covers/nndl-practice-cover.webp" alt="《神经网络与深度学习：案例与实践（第二版）》封面" width="160">
     </td>
     <td width="70%" valign="top">
       <h3>第二版 · PyTorch 配套代码</h3>
       <p>本书把神经网络模型、深度学习原理和工程实践放在同一条学习线上：一边理解模型，一边用 PyTorch 从零实现关键组件，再把它们用于可运行的案例。</p>
-      <p>全书共 10 章，仓库提供 17 个 Notebook、逐章实现说明和配套测试。从线性模型、卷积网络和循环网络出发，逐步进入注意力机制、图神经网络、大语言模型与智能体。</p>
-      <p><strong>适合读者：</strong>正在学习深度学习的本科生、研究生、工程师，以及希望把《神经网络与深度学习》理论内容真正跑起来的读者。</p>
+      <p>全书共 10 章，仓库提供配套 Notebook、逐章实现说明和测试。从线性模型、卷积网络和循环网络出发，逐步进入注意力机制、图神经网络、大语言模型与智能体。</p>
+      <p><strong>适合读者：</strong>有 Python 基础、希望动手学习深度学习的学生与工程师，可搭配理论书阅读。</p>
       <p><strong>当前状态：</strong>第二版处于出版筹备阶段，PDF 与配套代码会随出版前修订持续更新。</p>
     </td>
   </tr>
 </table>
-
-## 先从哪里开始
-
-| 你的目标 | 建议路径 |
-|---|---|
-| 第一次使用 PyTorch | 第 1 章 → 第 2 章 → 第 4 章 |
-| 系统学习深度学习实践 | 按第 1—10 章顺序学习 |
-| 计算机视觉 | 第 1 章 → 第 4 章 → 第 5 章 → 第 7 章 |
-| 序列建模与 Transformer | 第 1 章 → 第 4 章 → 第 6 章 → 第 8 章 |
-| 大语言模型与智能体 | 第 8 章 → 第 10 章；基础薄弱时先补第 1、4 章 |
-| 图神经网络 | 第 1 章 → 第 4 章 → 第 9 章 |
-
-## 章节目录
-
-| 章 | 主题与代码入口 | 主要实践内容 |
-|---|---|---|
-| 1 | [实践基础](pytorch/chap1实践基础/) | Tensor、广播、自动微分、`nn.Module`、`Dataset` 与 `DataLoader` |
-| 2 | [机器学习概述](pytorch/chap2机器学习概述/) | 机器学习五要素、线性与多项式回归、`RunnerV1`、加州房价预测 |
-| 3 | [线性模型](pytorch/chap3线性模型/) | Logistic/Softmax 回归、手写梯度、`RunnerV2`、鸢尾花分类 |
-| 4 | [前馈神经网络](pytorch/chap4前馈神经网络/) | 激活函数、手算反向传播、MLP、`RunnerV3`、Moons 与鸢尾花分类 |
-| 5 | [卷积神经网络](pytorch/chap5卷积神经网络/) | 从零实现卷积、LeNet-5、残差网络、MNIST 与 CIFAR-10 |
-| 6 | [循环神经网络](pytorch/chap6循环神经网络/) | SRN、LSTM、梯度截断、变长序列与双向 LSTM |
-| 7 | [网络优化与正则化](pytorch/chap7网络优化与正则化/) | 优化器、参数初始化、BatchNorm、暂退法（Dropout）与学习率调度 |
-| 8 | [注意力机制](pytorch/chap8注意力机制/) | 加性注意力、缩放点积注意力、多头注意力、位置编码与 Transformer |
-| 9 | [图神经网络](pytorch/chap9图神经网络/) | GCN、GraphSAGE、GAT、GIN，以及节点级与图级任务 |
-| 10 | [大语言模型与智能体](pytorch/chap10大语言模型与智能体/) | nanoGPT、解码与 KV Cache、LoRA、SFT、DPO、ReAct 与 RAG |
-
-每章目录中都有 Notebook 入口和实现要点；完整环境说明、数据集下载方式与批量执行方法见 [`pytorch/README.md`](pytorch/README.md)。
 
 ## 快速开始
 
@@ -84,7 +50,35 @@ jupyter notebook "pytorch/chap1实践基础/实践基础.ipynb"
 
 使用 NVIDIA GPU 时，请按 [PyTorch 官方安装页](https://pytorch.org/get-started/)选择与本机 CUDA 环境匹配的安装命令。
 
-## 不只是十组 Notebook
+## 先从哪里开始
+
+| 你的目标 | 建议路径 |
+|---|---|
+| 第一次使用 PyTorch | 第 1 章 → 第 2 章 → 第 4 章 |
+| 系统学习深度学习实践 | 按第 1—10 章顺序学习 |
+| 计算机视觉 | 第 1 章 → 第 4 章 → 第 5 章 → 第 7 章 |
+| 序列建模与 Transformer | 第 1 章 → 第 4 章 → 第 6 章 → 第 8 章 |
+| 大语言模型与智能体 | 第 8 章 → 第 10 章；基础薄弱时先补第 1、4 章 |
+| 图神经网络 | 第 1 章 → 第 4 章 → 第 9 章 |
+
+## 章节目录
+
+| 章 | 主题与代码入口 | 主要实践内容 |
+|---|---|---|
+| 1 | [实践基础](pytorch/chap1实践基础/) | Tensor、广播、自动微分、`nn.Module`、`Dataset` 与 `DataLoader` |
+| 2 | [机器学习概述](pytorch/chap2机器学习概述/) | 机器学习五要素、线性与多项式回归、`RunnerV1`、加州房价预测 |
+| 3 | [线性模型](pytorch/chap3线性模型/) | Logistic/Softmax 回归、手写梯度、`RunnerV2`、鸢尾花分类 |
+| 4 | [前馈神经网络](pytorch/chap4前馈神经网络/) | 激活函数、手算反向传播、MLP、`RunnerV3`、Moons 与鸢尾花分类 |
+| 5 | [卷积神经网络](pytorch/chap5卷积神经网络/) | 从零实现卷积、LeNet-5、残差网络、MNIST 与 CIFAR-10 |
+| 6 | [循环神经网络](pytorch/chap6循环神经网络/) | SRN、LSTM、梯度截断、变长序列与双向 LSTM |
+| 7 | [网络优化与正则化](pytorch/chap7网络优化与正则化/) | 优化器、参数初始化、BatchNorm、暂退法（Dropout）与学习率调度 |
+| 8 | [注意力机制](pytorch/chap8注意力机制/) | 加性注意力、缩放点积注意力、多头注意力、位置编码与 Transformer |
+| 9 | [图神经网络](pytorch/chap9图神经网络/) | GCN、GraphSAGE、GAT、GIN，以及节点级与图级任务 |
+| 10 | [大语言模型与智能体](pytorch/chap10大语言模型与智能体/) | nanoGPT、解码与 KV Cache、LoRA、SFT、DPO、ReAct 与 RAG |
+
+每章目录中都有 Notebook 入口和实现要点；完整环境说明、数据集下载方式与批量执行方法见 [`pytorch/README.md`](pytorch/README.md)。
+
+## 从 Notebook 到可复用代码
 
 配套代码会随着章节推进，逐步搭建轻量级学习框架 [`pytorch/nndl/`](pytorch/nndl/)：
 
@@ -143,7 +137,11 @@ python -m pytest pytorch/tests/test_chap8.py -v
 - [《大模型与智能体》](https://github.com/nndl/llm-beginner)
 - [第一版 PaddlePaddle 配套代码](https://github.com/nndl/practice-in-paddle)
 
-## 仓库维护说明
+<details>
+<summary>仓库维护说明</summary>
+
 
 - [`_meta.yml`](_meta.yml) 是主站书目卡片的数据源。
 - 主站构建时由 [`nndl.github.io/scripts/aggregate-books.py`](https://github.com/nndl/nndl.github.io/blob/main/scripts/aggregate-books.py) 汇总各书元数据。
+
+</details>
