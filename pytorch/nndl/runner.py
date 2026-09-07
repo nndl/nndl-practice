@@ -50,7 +50,7 @@ class RunnerV1:
 
 
 # --------------------------------------------------------------------------- #
-# RunnerV2：全批量梯度下降 + 早停                                              #
+# RunnerV2：全批量梯度下降 + 最佳快照                                              #
 # --------------------------------------------------------------------------- #
 class RunnerV2:
     """全批量梯度下降；记录 train/dev 历史到 history 字典；保存 dev 最优模型。
@@ -78,11 +78,11 @@ class RunnerV2:
         X, y = train_set
         for epoch in range(num_epochs):
             # 训练一步
-            logits = self.model(X)
-            trn_loss = self.loss_fn(logits, y)
+            probabilities = self.model(X)
+            trn_loss = self.loss_fn(probabilities, y)
             if hasattr(trn_loss, "item"):
                 trn_loss = trn_loss.item()
-            trn_score = self.metric(logits, y)
+            trn_score = self.metric(probabilities, y)
             if hasattr(trn_score, "item"):
                 trn_score = trn_score.item()
             self.model.backward(y)
@@ -106,11 +106,11 @@ class RunnerV2:
         训练循环里由 train 自己 append，最终测试集评估不会污染 dev 历史。
         """
         X, y = data_set
-        logits = self.model(X)
-        loss = self.loss_fn(logits, y)
+        probabilities = self.model(X)
+        loss = self.loss_fn(probabilities, y)
         if hasattr(loss, "item"):
             loss = loss.item()
-        score = self.metric(logits, y)
+        score = self.metric(probabilities, y)
         if hasattr(score, "item"):
             score = score.item()
         return score, loss
@@ -130,11 +130,11 @@ class RunnerV2:
 # RunnerV3：DataLoader + state_dict                                            #
 # --------------------------------------------------------------------------- #
 class RunnerV3:
-    """小批量训练 + 任意 metric + best-checkpoint（state_dict）。
+    """小批量训练 + 可按样本汇总的 metric + best-checkpoint（state_dict）。
 
     - model：nn.Module 子类
     - optimizer：torch.optim.Optimizer
-    - loss_fn：例如 nn.CrossEntropyLoss()
+    - loss_fn：例如 nn.CrossEntropyLoss()，返回批内样本平均值
     - metric_fn(out, y) -> float：标量评价指标；缺省时以 dev_loss 作 metric
     - higher_is_better：metric 越大越好（accuracy）还是越小越好（loss/MAE）
     - device：若给定（'cuda' / 'cpu' / torch.device），构造时把 model 搬到该 device，
@@ -150,7 +150,7 @@ class RunnerV3:
         self.optimizer = optimizer
         self.loss_fn = loss_fn
         self.metric_fn = metric_fn
-        self.higher_is_better = higher_is_better
+        self.higher_is_better = higher_is_better if metric_fn is not None else False
         # train_loss/dev_loss/dev_metric/lr 按 epoch 记录；train_step_loss 逐 iteration 记录
         # （画细粒度训练损失曲线用，例如 IMDB BiLSTM 那张书图）。
         self.history = {"train_loss": [], "dev_loss": [], "dev_metric": [], "lr": [],

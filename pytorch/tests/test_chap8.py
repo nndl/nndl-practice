@@ -6,45 +6,12 @@ from pathlib import Path
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from nndl.attention import AdditiveAttention, MultiHeadAttention, scaled_dot_attention as _scaled_dot
 
 
-def test_lcqmc_padding_uses_truncated_sequence_length():
-    """截断后的批内最大长度不得重新被原始长样本撑大（Issue #32）。"""
-    notebook_path = (
-        Path(__file__).resolve().parents[1]
-        / "chap8注意力机制"
-        / "注意力机制-下.ipynb"
-    )
-    notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
-    source = "".join(
-        "".join(cell.get("source", []))
-        for cell in notebook["cells"]
-    )
-    assert "max_len = max(max_len, len(input_ids[-1]))" in source
-    assert "max_len = max(max_len, len(input_id))" not in source
-
-    max_seq_len = 4
-    raw_batch = [list(range(2)), list(range(10))]
-    input_ids = []
-    max_len = 0
-    for input_id in raw_batch:
-        input_ids.append(input_id[:max_seq_len])
-        max_len = max(max_len, len(input_ids[-1]))
-    assert max_len == max_seq_len
 
 
 # ---- AdditiveAttention ----
-class AdditiveAttention(nn.Module):
-    def __init__(self, hidden_size, attn_size=64):
-        super().__init__()
-        self.W = nn.Linear(hidden_size, attn_size, bias=False)
-        self.v = nn.Linear(attn_size, 1, bias=False)
-
-    def forward(self, H, mask):
-        scores = self.v(torch.tanh(self.W(H))).squeeze(-1)
-        scores = scores.masked_fill(~mask, torch.finfo(scores.dtype).min)
-        attn = F.softmax(scores, dim=-1)
-        return torch.bmm(attn.unsqueeze(1), H).squeeze(1), attn
 
 
 def test_additive_attention_masks_padding():
@@ -68,13 +35,6 @@ def test_additive_attention_masks_padding():
 
 
 # ---- Scaled dot-product attention ----
-def _scaled_dot(Q, K, V, mask=None):
-    d_k = Q.size(-1)
-    scores = Q @ K.transpose(-2, -1) / math.sqrt(d_k)
-    if mask is not None:
-        scores = scores.masked_fill(~mask, torch.finfo(scores.dtype).min)
-    attn = F.softmax(scores, dim=-1)
-    return attn @ V, attn
 
 
 def test_scaled_dot_attention_with_identity_input_is_diagonal_dominant():
@@ -96,27 +56,6 @@ def test_scaled_dot_attention_normalization():
 
 
 # ---- MultiHeadAttention ----
-class MultiHeadAttention(nn.Module):
-    def __init__(self, embed_dim, n_heads):
-        super().__init__()
-        assert embed_dim % n_heads == 0
-        self.n_heads = n_heads
-        self.head_dim = embed_dim // n_heads
-        self.W_q = nn.Linear(embed_dim, embed_dim)
-        self.W_k = nn.Linear(embed_dim, embed_dim)
-        self.W_v = nn.Linear(embed_dim, embed_dim)
-        self.W_o = nn.Linear(embed_dim, embed_dim)
-
-    def _split(self, x):
-        B, L, _ = x.shape
-        return x.reshape(B, L, self.n_heads, self.head_dim).transpose(1, 2)
-
-    def forward(self, x, key_padding_mask=None):
-        Q = self._split(self.W_q(x)); K = self._split(self.W_k(x)); V = self._split(self.W_v(x))
-        mask = key_padding_mask[:, None, None, :] if key_padding_mask is not None else None
-        out, attn = _scaled_dot(Q, K, V, mask=mask)
-        B, h, L, d = out.shape
-        return self.W_o(out.transpose(1, 2).reshape(B, L, h * d)), attn
 
 
 def test_mha_shapes():

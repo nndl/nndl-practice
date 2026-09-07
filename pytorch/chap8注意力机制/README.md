@@ -1,22 +1,13 @@
-# chap8 注意力机制（PyTorch）
+# 第8章 注意力机制
 
-| Notebook | 内容 |
-|---|---|
-| [`注意力机制-上.ipynb`](注意力机制-上.ipynb) | 加性注意力 + masking + BiLSTM 上加注意力做情感分类 + 注意力权重可视化 |
-| [`注意力机制-下.ipynb`](注意力机制-下.ipynb) | scaled dot-product attention、多头注意力、sinusoidal 位置编码、Transformer Encoder（Pre-LN）、与 `nn.TransformerEncoder` 等价 |
-
-## 实现要点
-
-- **加性注意力**：$s_t = v^\top \tanh(W h_t)$。一份 query（这里就是 LSTM 隐状态序列）。
-- **Scaled dot-product attention**：$\text{softmax}(Q K^\top / \sqrt{d_k}) V$。$\sqrt{d_k}$ 缩放避免高维下点积过大、softmax 集中。
-- **mask padding**：把 score 设成 $-\infty$ 让 softmax 自然为 0。不要先 softmax 再乘 0/1 mask（会破坏归一化）。
-- **多头**：把 $Q/K/V$ 切到 $h$ 个低维子空间并行；后接一个 `W_o` 投影回原维度。
-- **位置编码**：自注意力本身位置无感；sinusoidal PE 或 learned PE 都常用。
-- **Transformer block** = MHA + 残差 + LayerNorm + FFN + 残差 + LayerNorm。**Pre-LN**（norm 在 sublayer 前）训练更稳，是现代默认。
-- **`nn.TransformerEncoderLayer`** 的 `src_key_padding_mask` 约定**与教科书相反**：`True` 表示要 **ignore** 的位置（padding）。手写转用内置时要 `~mask` 取反。
-
-## 测试
+从各Notebook所在目录依次运行。先在PyTorch根目录执行：
 
 ```bash
-python -m pytest pytorch/tests/test_chap8.py -v
+python datasets/download.py --only=imdb,lcqmc,bert_vocab
 ```
+
+- 上：真实IMDB上的BiLSTM加性、点积、多头自注意力。默认5,000/1,000/1,000条，64维，长度128，5回合；共同初始参数和批次顺序与第6章对齐。
+- 下：字符Jaccard基线与从零训练的LCQMC Transformer；默认10,000/2,000/2,000条，1层、64维、4头、5回合。随后核验RoPE、MoE、SDPA及规范化位置。
+- 每组模型保存独立的验证集最佳快照。表中成绩仅对应书稿记录的短程配置，不代表全量训练效果。
+- 保留训练/验证/测试边界；字符词表复用BERT字表，不加载其预训练权重，也不等同于BERT分词。
+- 注意力热图展示汇聚分配，不能直接作因果解释。掩码、位置偏移及框架接口对齐均有可运行检查。

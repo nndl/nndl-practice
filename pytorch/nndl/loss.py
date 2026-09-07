@@ -13,7 +13,7 @@ from .op import Op
 
 def mean_squared_error(y_true, y_pred):
     """带 1/2 系数的均方误差，与第 2 章的损失定义保持一致。"""
-    assert y_true.shape[0] == y_pred.shape[0]
+    assert y_true.shape == y_pred.shape
     return 0.5 * ((y_true - y_pred) ** 2).mean()
 
 
@@ -40,7 +40,7 @@ class BinaryCrossEntropyLoss(Op):
         N = predicts.shape[0]
         # 注意：float32 下 1-1e-9 会舍入为 1.0，使 clamp 上界失效、log(1-p) 仍可能为 -inf；
         # eps 取 1e-7 才能保证 1-eps 严格小于 1（与 Keras 等的默认一致）。
-        eps = 1e-7
+        eps = max(1e-7, torch.finfo(predicts.dtype).eps)
         p = predicts.clamp(eps, 1 - eps)
         loss = -1 / N * (labels.t() @ torch.log(p) + (1 - labels).t() @ torch.log(1 - p))
         return loss.squeeze()
@@ -63,6 +63,6 @@ class MultiCrossEntropyLoss(Op):
         self.predicts = predicts
         self.labels = labels
         N = predicts.shape[0]
-        eps = 1e-12
-        p_correct = predicts[torch.arange(N), labels].clamp(eps, 1.0)
+        eps = torch.finfo(predicts.dtype).tiny
+        p_correct = predicts[torch.arange(N, device=predicts.device), labels].clamp(eps, 1.0)
         return -torch.log(p_correct).mean()

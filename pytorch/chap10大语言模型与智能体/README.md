@@ -1,39 +1,36 @@
-# chap10 大语言模型与智能体（PyTorch）
+# 第10章：大语言模型与智能体（PyTorch）
 
-| Notebook | 内容 |
+| Notebook | 实验 |
 |---|---|
-| [`大语言模型与智能体-上.ipynb`](大语言模型与智能体-上.ipynb) | 字符级 nanoGPT 从零实现：因果多头自注意力、pre-LN Transformer block、TinyShakespeare 上预训练；解码策略（greedy / temperature / top-k / top-p）；KV cache 推理加速 |
-| [`大语言模型与智能体-下.ipynb`](大语言模型与智能体-下.ipynb) | LoRA 低秩适配器；SFT（大小写转换玩具任务）；DPO 直接偏好优化；ReAct 智能体雏形（Calculator + Search 工具）；RAG 检索增强生成 |
+| [上篇](大语言模型与智能体-上.ipynb) | 词内BPE、字符级NanoGPT预训练、采样对照、完整模型KV缓存的一致性与计时 |
+| [下篇](大语言模型与智能体-下.ipynb) | 在上篇权重上做LoRA、SFT与DPO；结构化工具调用与带来源的检索流程 |
 
-数据集：`tinyshakespeare.txt` 由 notebook 自动从 karpathy/char-rnn 下载（约 1.1 MB），已加入 `.gitignore`。
+从本目录依次运行。上篇自动下载约1.1MB的TinyShakespeare语料并缓存，保存`nanogpt_pretrained.pt`；下篇加载其中的模型配置、词表与选定权重。CPU为默认设备，依赖PyTorch、NumPy、Matplotlib；下篇检索还需要scikit-learn。共享模型代码在[`nndl/llm.py`](../nndl/llm.py)。
 
-上篇默认按书中配置训练 1500 步。快速验证代码链路时，可先设置 `NNDL_QUICK_RUN=1`；此模式只训练 20 步、减少评估批次，并保留损失记录和阶段采样。
+## 实验条件与结果
 
-## 实现要点
+- 预训练：连续文本按90%/5%/5%划分；词表只来自训练文本。4层、128维、4头、长度64、批大小32，共813568个参数，1500次更新。每次评价固定20批，窗口可重叠；使用验证最优权重，在保留测试窗口上评价。本次CPU运行约15分钟，测试交叉熵1.7388纳特/字符、困惑度5.691；运行时间随设备而变。
+- LoRA与SFT：24576个可训练参数，14个训练词、6个验证词、6个测试词，200次更新。只在回答词元上算损失，右侧补齐目标为−100。验证选择第40步，训练词和测试词完整匹配分别为0/14和0/6；训练损失继续下降不能证明学会转换规则。
+- DPO：同一词的大写回答优于小写回答，属于规则构造的教学偏好。SFT副本作为冻结参考，100次更新。初始损失为ln(2)，测试偏好损失0.0426；偏好比较与自由生成的正确率是不同指标。
 
-### 上：nanoGPT 预训练与采样
+上篇保留可选的20步流程检查。设置`NNDL_QUICK_RUN=1`后，更新数改为20、批大小改为8；它不复现以上训练结果，仍会覆盖同名检查点。关闭开关并从头运行可恢复完整实验。
 
-- **decoder-only 现代设计**：token + 可学习位置嵌入 → $N$ 个 pre-LN block（LN → MHA → 残差 → LN → FFN → 残差）→ 末尾 LN → 线性层映射到词表。pre-LN 比 post-LN 训练稳定。
-- **因果自注意力**：用 `torch.triu(diagonal=1).bool()` 上三角 mask 把 `att.masked_fill(mask, -inf)` 屏蔽未来位置；`qkv` 投影合并到一个 `Linear(n_embd, 3 * n_embd)` 节省一次 matmul。
-- **训练目标**：next-token 预测的交叉熵，等价于把 `[x_0, ..., x_{T-1}]` 当输入、`[x_1, ..., x_T]` 当目标（错开一位），所有位置并行算 loss。
-- **AdamW + warmup + cosine decay**：`betas=(0.9, 0.95)`、`weight_decay=0.1` 是 GPT/Llama 现代实践。warmup 防早期梯度爆炸，cosine 让末期学习率平滑下降。
-- **采样策略**：`temperature` 调整分布尖锐度；`top-k` 只在前 $k$ 个 token 上重归一化采样；`top-p`（nucleus）取累积概率到 $p$ 的最小集合。三者可以叠加。
-- **KV cache**：朴素 `generate` 每步重算整个前缀（$O(T^2)$）。缓存每层 attention 的 K/V，新一步只算新位置 q 再与缓存 K/V 做注意力，复杂度降到 $O(T)$。生产推理（vLLM、TGI 等）必备优化。
+## 需要核对的边界
 
-### 下：微调、对齐与智能体
-
-- **LoRA**：冻结基础 `Linear` 的 $\boldsymbol{W}_0$，只学习低秩增量 $\Delta\boldsymbol{W} = \boldsymbol{B}\boldsymbol{A}$（$\boldsymbol{A}\in\mathbb{R}^{r\times d}$、$\boldsymbol{B}\in\mathbb{R}^{d\times r}$）。$\boldsymbol{B}$ 初始化为 0 保证训练开始时 LoRA 输出等价原模型。`scaling = alpha / r` 解耦秩和学习率。
-- **SFT 训练**：在 instruction/response 数据对上继续 next-token loss，**只在 response 部分算 loss**——把 prompt 部分的 target 填 `-100`，`F.cross_entropy` 默认忽略 `-100`。本章用"输入小写文本，输出大写"的玩具任务演示。
-- **DPO**：把 RLHF 三步（偏好数据 → 奖励模型 → PPO）合并成单一对比损失，不需要单独训奖励模型、也不需要 RL：
-
-  $$\mathcal{L}_\mathrm{DPO} = -\log\sigma\Big(\beta\big[\log\tfrac{\pi_\theta(y_w|x)}{\pi_\mathrm{ref}(y_w|x)} - \log\tfrac{\pi_\theta(y_l|x)}{\pi_\mathrm{ref}(y_l|x)}\big]\Big).$$
-
-  $\pi_\mathrm{ref}$ 是冻结的参考模型（通常 SFT 后的副本），$\beta$ 控制偏离参考的程度。
-- **ReAct**：让 LM 交替输出 `Thought → Action(tool, args) → Observation(tool result) → ...` 直到 `Answer:`。本章用一个 mock LLM 演示完整控制流（算术 → `Calculator`、事实查询 → `Search`）；真实场景下 LLM 调用替换 `mock_llm` 即可。
-- **RAG**：知识库 chunk → embedding → 向量数据库；检索 top-$k$ chunk → 拼接到 prompt → LLM 回答。本章用简单的向量内积检索 + mock embedding 演示流程，生产用 FAISS / Milvus / Chroma 替换。
+- 合并Q/K/V投影与Pre-LN组块用于展示实现，不能据此概括所有现代大模型的架构。BPE按当前语料的词内相邻片段频次学习，切分不保证对应词根和词缀。
+- Top-k保留恰好k个索引，Top-p保留累积概率达到阈值的最小前缀；temperature=0直接贪心。缓存先核验完整前缀与多词元增量的logits，再测时。本例只在64个绝对位置内缓存，不支持裁剪缓存后重新编号。
+- LoRA的A/B继承底模精度和设备。B初始为0，首次输出与底模一致；此时A的首次梯度也为0。可训练参数比例不能当作总显存缩减比例。
+- `mock_llm`用固定规则选择动作，`Search`查离线条目，计算器只支持有界四则运算。工具结构错误、调用失败和步数耗尽均有明确状态；前面的字符模型没有学会调用这些工具。
+- 检索资料是虚构课程手册，以字符TF-IDF匹配；回答函数返回带来源的摘录，没有接入真实生成模型。分别检查证据召回、引用支持和无资料问题，才能评估后续接入的RAG系统。
 
 ## 测试
 
+从`nndl-practice`仓库根目录运行：
+
 ```bash
-python -m pytest pytorch/tests/test_chap10.py -v
+python -m pytest pytorch/tests/test_chap10.py -q
 ```
+
+测试直接使用Notebook和共享模块的实现，覆盖因果性、SDPA前向与全部梯度对照、KV缓存、采样边界、LoRA、SFT掩码、DPO梯度及工具/检索状态。
+
+参考：[LoRA](https://arxiv.org/abs/2106.09685)、[QLoRA](https://arxiv.org/abs/2305.14314)、[DPO](https://arxiv.org/abs/2305.18290)、[ReAct](https://arxiv.org/abs/2210.03629)、[RAG](https://arxiv.org/abs/2005.11401)。

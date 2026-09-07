@@ -258,6 +258,12 @@ def test_data_sentiment_dataset_collate():
     assert labels.shape == (3,)
 
 
+def test_mean_squared_error_rejects_accidental_outer_broadcast():
+    import pytest
+    with pytest.raises(AssertionError):
+        nndl.mean_squared_error(torch.ones(3), torch.ones(3, 1))
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_") and callable(fn):

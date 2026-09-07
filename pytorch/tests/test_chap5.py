@@ -4,7 +4,7 @@
 - 朴素 conv2d 与 nn.Conv2d 数值一致
 - LeNet5 前向输出形状正确，参数量 ~62k
 - ResBlock / PlainBlock 同输入下形状一致，参数量相近
-- LeNet5 在合成 28x28 数据上能拟合（loss 下降）
+- LeNet5 在合成 32x32 数据上能拟合（loss 下降）
 """
 import torch
 import torch.nn as nn
@@ -39,40 +39,42 @@ def test_naive_conv_matches_nn_conv2d():
     assert (manual - out).abs().max().item() < 1e-6
 
 
-class LeNet5(nn.Module):
-    def __init__(self, n_class=10):
-        super().__init__()
-        self.conv1 = nn.Conv2d(1, 6, 5, padding=2)
-        self.pool1 = nn.MaxPool2d(2, 2)
-        self.conv2 = nn.Conv2d(6, 16, 5)
-        self.pool2 = nn.MaxPool2d(2, 2)
-        self.fc1 = nn.Linear(16*5*5, 120)
-        self.fc2 = nn.Linear(120, 84)
-        self.fc3 = nn.Linear(84, n_class)
+def _notebook_classes(part):
+    """Load class definitions only, so tests exercise the teaching code without training cells."""
+    import ast
+    import json
+    from pathlib import Path
+    path = Path(__file__).resolve().parents[1] / f"chap5卷积神经网络/卷积神经网络-{part}.ipynb"
+    namespace = {"torch": torch, "nn": nn, "F": F}
+    for cell in json.loads(path.read_text(encoding="utf8"))["cells"]:
+        if cell["cell_type"] != "code":
+            continue
+        tree = ast.parse("".join(cell["source"]))
+        classes = [node for node in tree.body if isinstance(node, ast.ClassDef)
+                   and node.name in {"Conv2d", "Pool2D", "Model_LeNet", "ResBlock"}]
+        if classes:
+            exec(compile(ast.Module(body=classes, type_ignores=[]), str(path), "exec"), namespace)
+    return namespace
 
-    def forward(self, x):
-        x = self.pool1(F.relu(self.conv1(x)))
-        x = self.pool2(F.relu(self.conv2(x)))
-        x = x.flatten(1)
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        return self.fc3(x)
+
+def LeNet5(n_class=10):
+    return _notebook_classes("上")["Model_LeNet"](in_channels=1, num_classes=n_class)
 
 
 def test_lenet_shapes_and_params():
     m = LeNet5()
-    out = m(torch.zeros(2, 1, 28, 28))
+    out = m(torch.zeros(2, 1, 32, 32))
     assert tuple(out.shape) == (2, 10)
     n_params = sum(p.numel() for p in m.parameters())
     assert 60_000 < n_params < 65_000, f"unexpected param count: {n_params}"
 
 
 def test_lenet_trains_on_synthetic():
-    """Two clusters of 28x28 noise — one class around 0, one around 0.5; LeNet should reach >90% on train."""
+    """Two clusters of 32x32 noise — one class around 0, one around 0.5; LeNet should reach >90% on train."""
     torch.manual_seed(0)
     n = 100
-    X = torch.cat([torch.randn(n, 1, 28, 28) * 0.1,
-                   torch.randn(n, 1, 28, 28) * 0.1 + 0.5])
+    X = torch.cat([torch.randn(n, 1, 32, 32) * 0.1,
+                   torch.randn(n, 1, 32, 32) * 0.1 + 0.5])
     y = torch.cat([torch.zeros(n, dtype=torch.long), torch.ones(n, dtype=torch.long)])
     # Two-class output enough
     model = LeNet5(n_class=2)
@@ -89,34 +91,36 @@ def test_lenet_trains_on_synthetic():
     assert acc > 0.95, f"train acc too low: {acc}"
 
 
-class _PlainBlock(nn.Module):
-    def __init__(self, in_ch, out_ch, stride=1):
-        super().__init__()
-        self.conv1 = nn.Conv2d(in_ch, out_ch, 3, stride=stride, padding=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(out_ch)
-        self.conv2 = nn.Conv2d(out_ch, out_ch, 3, padding=1, bias=False)
-        self.bn2 = nn.BatchNorm2d(out_ch)
-
-    def forward(self, x):
-        x = F.relu(self.bn1(self.conv1(x)))
-        return F.relu(self.bn2(self.conv2(x)))
+def _PlainBlock(in_ch, out_ch, stride=1):
+    return _notebook_classes("下")["ResBlock"](in_ch, out_ch, stride, use_residual=False)
 
 
-class _ResBlock(nn.Module):
-    def __init__(self, in_ch, out_ch, stride=1):
-        super().__init__()
-        self.conv1 = nn.Conv2d(in_ch, out_ch, 3, stride=stride, padding=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(out_ch)
-        self.conv2 = nn.Conv2d(out_ch, out_ch, 3, padding=1, bias=False)
-        self.bn2 = nn.BatchNorm2d(out_ch)
-        self.shortcut = (nn.Identity() if (in_ch == out_ch and stride == 1)
-                         else nn.Sequential(nn.Conv2d(in_ch, out_ch, 1, stride=stride, bias=False),
-                                            nn.BatchNorm2d(out_ch)))
+def _ResBlock(in_ch, out_ch, stride=1):
+    return _notebook_classes("下")["ResBlock"](in_ch, out_ch, stride, use_residual=True)
 
-    def forward(self, x):
-        out = F.relu(self.bn1(self.conv1(x)))
-        out = self.bn2(self.conv2(out))
-        return F.relu(out + self.shortcut(x))
+
+def test_rectangular_pooling_matches_values_and_gradients():
+    pool_class = _notebook_classes("上")["Pool2D"]
+    torch.manual_seed(91)
+    for mode in ("max", "avg"):
+        x = torch.randn(2, 3, 5, 8, dtype=torch.double, requires_grad=True)
+        y = x.detach().clone().requires_grad_()
+        actual = pool_class((2, 3), mode, 2)(x)
+        expected = getattr(F, mode + "_pool2d")(y, (2, 3), stride=2)
+        torch.testing.assert_close(actual, expected)
+        actual.sum().backward(); expected.sum().backward()
+        torch.testing.assert_close(x.grad, y.grad)
+
+
+def test_residual_toggle_preserves_initial_parameters():
+    block = _notebook_classes("下")["ResBlock"]
+    torch.manual_seed(3)
+    plain = block(3, 5, stride=2, use_residual=False)
+    torch.manual_seed(3)
+    residual = block(3, 5, stride=2, use_residual=True)
+    assert plain.state_dict().keys() == residual.state_dict().keys()
+    for name, value in plain.state_dict().items():
+        torch.testing.assert_close(value, residual.state_dict()[name])
 
 
 def test_blocks_shapes():

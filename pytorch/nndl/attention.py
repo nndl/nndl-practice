@@ -15,6 +15,17 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+def masked_softmax(scores, mask):
+    """True为有效位置；全屏蔽行输出0，避免均匀伪权重或NaN。"""
+    if mask.dtype != torch.bool:
+        raise ValueError("mask must be boolean")
+    mask = mask.to(scores.device)
+    any_valid = mask.any(dim=-1, keepdim=True)
+    masked = scores.masked_fill(~mask, float("-inf"))
+    safe = torch.where(any_valid, masked, torch.zeros_like(masked))
+    return F.softmax(safe, dim=-1).masked_fill(~mask, 0.0)
+
+
 # --------------------------------------------------------------------------- #
 # Additive attention（chap8 上）                                                #
 # --------------------------------------------------------------------------- #
@@ -35,8 +46,7 @@ class AdditiveAttention(nn.Module):
 
     def forward(self, H, mask):
         scores = self.v(torch.tanh(self.W(H))).squeeze(-1)
-        scores = scores.masked_fill(~mask, torch.finfo(scores.dtype).min)
-        attn = F.softmax(scores, dim=-1)
+        attn = masked_softmax(scores, mask)
         context = torch.bmm(attn.unsqueeze(1), H).squeeze(1)
         return context, attn
 
@@ -55,9 +65,7 @@ def scaled_dot_attention(Q, K, V, mask=None):
     """
     d_k = Q.size(-1)
     scores = Q @ K.transpose(-2, -1) / math.sqrt(d_k)
-    if mask is not None:
-        scores = scores.masked_fill(~mask, torch.finfo(scores.dtype).min)
-    attn = F.softmax(scores, dim=-1)
+    attn = F.softmax(scores, dim=-1) if mask is None else masked_softmax(scores, mask)
     return attn @ V, attn
 
 
@@ -73,7 +81,8 @@ class MultiHeadAttention(nn.Module):
 
     def __init__(self, embed_dim: int, n_heads: int):
         super().__init__()
-        assert embed_dim % n_heads == 0
+        if n_heads < 1 or embed_dim < 1 or embed_dim % n_heads:
+            raise ValueError("embed_dim must be positive and divisible by n_heads")
         self.n_heads = n_heads
         self.head_dim = embed_dim // n_heads
         self.W_q = nn.Linear(embed_dim, embed_dim)

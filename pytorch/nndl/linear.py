@@ -41,6 +41,7 @@ def optimizer_lsm(model: Linear, X, y, reg_lambda: float = 0.0):
 
         w* = (XᵀX + λI)⁻¹ Xᵀ (y - ȳ)
 
+    目标为残差平方和 / (2N) + λ ||w||² / (2N)。
     其中 `X` 已经减去均值，**偏置不参与正则化**。
 
     结果原地写入 `model.params['w']` 与 `model.params['b']`。
@@ -56,7 +57,11 @@ def optimizer_lsm(model: Linear, X, y, reg_lambda: float = 0.0):
     if reg_lambda == 0:
         # 直接解最小二乘问题，重复列、常量列等秩亏输入也能得到最小范数解。
         # 相比先构造 XᵀX 再 solve，lstsq 还避免了条件数被平方。
-        w = torch.linalg.lstsq(x_sub, y_sub).solution
+        if X.device.type == "cpu":
+            w = torch.linalg.lstsq(x_sub, y_sub, driver="gelsd").solution
+        else:
+            # CUDA 的 lstsq 仅支持要求满秩的 gels；伪逆兼容秩亏输入。
+            w = torch.linalg.pinv(x_sub) @ y_sub
     else:
         A = x_sub.T @ x_sub + reg_lambda * torch.eye(
             D, dtype=X.dtype, device=X.device

@@ -214,6 +214,21 @@ def test_runner_best_checkpoint_recoverable():
     assert loaded_acc > 0.85, f"iris dev acc too low: {loaded_acc}"
 
 
+def test_runnerv3_default_metric_saves_lower_loss(tmp_path):
+    """省略 metric_fn 时，保存误差更小的模型，而不是训练初期的大损失模型。"""
+    model = nn.Linear(1, 1, bias=False)
+    with torch.no_grad():
+        model.weight.zero_()
+    loader = DataLoader(TensorDataset(torch.ones(4, 1), torch.ones(4, 1)), batch_size=4)
+    runner = RunnerV3(model, torch.optim.SGD(model.parameters(), lr=0.2), nn.MSELoss())
+    path = tmp_path / "best_loss.pt"
+    runner.fit(loader, loader, num_epochs=3, log_every=None, best_path=path)
+    runner.load(path)
+    loss, _ = runner.evaluate(loader)
+    assert loss < 0.05  # 第1轮约0.36，第3轮约0.0467。
+    assert abs(loss - min(runner.history["dev_loss"])) < 1e-7
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_") and callable(fn):
