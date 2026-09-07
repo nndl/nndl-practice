@@ -135,7 +135,7 @@ class RunnerV3:
     - model：nn.Module 子类
     - optimizer：torch.optim.Optimizer
     - loss_fn：例如 nn.CrossEntropyLoss()，返回批内样本平均值
-    - metric_fn(out, y) -> float：标量评价指标；缺省时以 dev_loss 作 metric
+    - metric_fn(out, y)：返回 float 或标量 tensor；缺省时以 dev_loss 作 metric
     - higher_is_better：metric 越大越好（accuracy）还是越小越好（loss/MAE）
     - device：若给定（'cuda' / 'cpu' / torch.device），构造时把 model 搬到该 device，
       fit/_eval/predict 时自动把每个 batch 的张量也搬过去。默认 None 表示不接管 device。
@@ -169,13 +169,24 @@ class RunnerV3:
         - `log_every=None`：完全不打印 epoch 日志（用于内部 ablation 调用等）。
         - `grad_clip_norm`：若非 None，在 `backward()` 与 `step()` 之间调
           `nn.utils.clip_grad_norm_(params, grad_clip_norm)`（RNN/Attention 常用）。
-        - `lr_scheduler`：若给定，每个 epoch 末调一次 `lr_scheduler.step()`。
+        - `lr_scheduler`：每个 epoch 末调用一次；ReduceLROnPlateau 在验证后接收
+          dev_metric，需提供 dev_loader，且 mode 应与 higher_is_better 一致。
+          其他调度器调用 step()；按 iteration 调度的策略需使用自定义训练循环。
         - `patience`：连续 N 轮 dev_metric 无改善则提前停止（仅当 dev_loader 提供时生效）。
         - `seed`：固定 torch 随机数种子，便于复现实验。
 
         train_loader 每个 batch 解包为 `*inputs, y`，模型按 `model(*inputs)` 调用——
         因此既支持普通 `(x, y)`，也支持变长序列的 `(padded, lengths, y)` 等多输入约定。
         """
+        plateau = isinstance(lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau)
+        if plateau and dev_loader is None:
+            raise ValueError("ReduceLROnPlateau requires dev_loader")
+        if plateau and lr_scheduler.mode != ("max" if self.higher_is_better else "min"):
+            raise ValueError("ReduceLROnPlateau mode must match higher_is_better")
+        if log_every is not None and log_every < 1:
+            raise ValueError("log_every must be positive or None")
+        if patience is not None and patience < 1:
+            raise ValueError("patience must be positive or None")
         if seed is not None:
             torch.manual_seed(seed)
         best = -float("inf") if self.higher_is_better else float("inf")
@@ -192,16 +203,17 @@ class RunnerV3:
                     torch.nn.utils.clip_grad_norm_(self.model.parameters(), grad_clip_norm)
                 self.optimizer.step()
                 bs = inputs[0].size(0)
-                running += loss.item() * bs
+                batch_loss = loss.item()
+                running += batch_loss * bs
                 n += bs
-                self.history["train_step_loss"].append(loss.item())
+                self.history["train_step_loss"].append(batch_loss)
+            if n == 0:
+                raise ValueError("train_loader is empty (no samples); check the dataset and drop_last")
             train_loss = running / n
             self.history["train_loss"].append(train_loss)
             self.history["lr"].append(self.optimizer.param_groups[0]["lr"])
-            if lr_scheduler is not None:
-                lr_scheduler.step()
-
             should_log = log_every is not None and (epoch + 1) % log_every == 0
+            should_stop = False
             if dev_loader is not None:
                 dev_loss, dev_metric = self._eval(dev_loader)
                 self.history["dev_loss"].append(dev_loss)
@@ -222,36 +234,52 @@ class RunnerV3:
                 if patience is not None and no_improve >= patience:
                     if log_every is not None:
                         print(f"early stop at epoch {epoch+1} (no improvement for {patience} epochs)")
-                    break
+                    should_stop = True
             elif should_log:
                 print(f"epoch {epoch+1:4d}  train_loss={train_loss:.4f}")
+            if lr_scheduler is not None:
+                if plateau:
+                    lr_scheduler.step(dev_metric)
+                else:
+                    lr_scheduler.step()
+            if should_stop:
+                break
 
     @torch.no_grad()
     def _eval(self, loader):
+        was_training = self.model.training
         self.model.eval()
-        total_loss, total_m, n = 0.0, 0.0, 0
-        for batch in loader:
-            *inputs, y = self._to_device(batch)
-            out = self.model(*inputs)
-            bs = inputs[0].size(0)
-            total_loss += self.loss_fn(out, y).item() * bs
-            if self.metric_fn is not None:
-                total_m += self.metric_fn(out, y) * bs
-            n += bs
-        dev_loss = total_loss / n
-        dev_metric = (total_m / n) if self.metric_fn is not None else dev_loss
-        return dev_loss, dev_metric
+        try:
+            total_loss, total_m, n = 0.0, 0.0, 0
+            for batch in loader:
+                *inputs, y = self._to_device(batch)
+                out = self.model(*inputs)
+                bs = inputs[0].size(0)
+                total_loss += self.loss_fn(out, y).item() * bs
+                if self.metric_fn is not None:
+                    total_m += float(self.metric_fn(out, y)) * bs
+                n += bs
+            if n == 0:
+                raise ValueError("evaluation loader is empty (no samples); check the dataset and drop_last")
+            dev_loss = total_loss / n
+            dev_metric = (total_m / n) if self.metric_fn is not None else dev_loss
+            return dev_loss, dev_metric
+        finally:
+            self.model.train(was_training)
 
     def evaluate(self, loader):
+        """返回按样本加权的 (loss, metric)，并恢复调用前的训练/评价模式。"""
         return self._eval(loader)
 
     @torch.no_grad()
     def predict(self, *inputs):
         """跟 fit 的多输入解包对齐；普通用法 `runner.predict(x)` 仍然成立。"""
+        was_training = self.model.training
         self.model.eval()
-        if self.device is not None:
-            inputs = tuple(t.to(self.device) if torch.is_tensor(t) else t for t in inputs)
-        return self.model(*inputs)
+        try:
+            return self.model(*self._to_device(inputs))
+        finally:
+            self.model.train(was_training)
 
     def save(self, path):
         """手动保存当前 model 的 state_dict（与 V1/V2 接口一致）。"""

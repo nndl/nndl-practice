@@ -1,21 +1,29 @@
-# chap5 卷积神经网络（PyTorch）
+# 第5章 卷积神经网络
 
-| Notebook | 内容 |
+| Notebook | 当前实验 |
 |---|---|
-| [`卷积神经网络-上.ipynb`](卷积神经网络-上.ipynb) | 朴素 conv2d vs `nn.Conv2d`、形状公式、Laplacian 边缘检测、LeNet-5 + MNIST 子集训练 + 第一层 kernel 可视化 |
-| [`卷积神经网络-下.ipynb`](卷积神经网络-下.ipynb) | `PlainBlock` vs `ResBlock`，同深度的 Plain-Net vs ResNet 在 CIFAR-10 子集上对比；`torchvision.models.resnet18` API 演示 |
+| [上篇](卷积神经网络-上.ipynb) | 单通道与多通道互相关、步长和填充、汇聚、手写算子与框架对照、LeNet的MNIST分类 |
+| [下篇](卷积神经网络-下.ipynb) | 在相同MNIST划分上比较有无残差连接，再调整ResNet18入口运行CIFAR-10分类 |
+
+从Notebook所在目录顺序运行。首次通过torchvision下载MNIST和CIFAR-10，缓存于 `~/.cache/torch_data`。环境安装见[运行说明](../README.md)。
+
+## 实验条件
+
+MNIST训练/验证/测试分别取1,000/200/200条，上下篇使用同一划分。残差实验控制学习率、初始参数和批次顺序，比较直连边的作用。CIFAR-10短程配置取5,000/1,000/1,000条，完整配置由Notebook中的开关控制。
+
+训练过程记录损失与验证指标，最后用验证集选出的模型评价测试集。短程结果只说明当前配置下的表现；运行时间和准确率需要连同设备、训练规模与随机种子报告。
 
 ## 实现要点
 
-- 深度学习里的 "conv" 实际是 cross-correlation（kernel 不翻转）。`nn.Conv2d` 即是该操作。
-- **形状公式**：$H_\text{out} = \lfloor (H + 2p - k) / s \rfloor + 1$。`padding = k // 2, stride = 1` 时尺寸保持不变。
-- **`Conv → BN → ReLU`** 是现代 CNN 的标配三件套；BN 让深网络的训练曲线更平滑。
-- **残差连接**：`out + shortcut(x)`；当 `in_ch != out_ch` 或 `stride > 1` 时，shortcut 用 `1x1 Conv` 投影对齐。
-- **MNIST/CIFAR 用 torchvision**：`datasets.MNIST` / `datasets.CIFAR10` 自动下载到 `~/.cache/torch_data`（首次运行时下载，约 50MB + 150MB）。
-- notebook 出于执行时间考虑用了小 subset（MNIST 5000/1000，CIFAR-10 5000/1000）。完整数据 + 更多 epoch 在 GPU 上跑 ~5min 内能到 ~99% / ~70%。
+- PyTorch卷积接口执行互相关，卷积核不翻转。形状对照要同时检查步长、填充、通道数和偏置。
+- 先验证手写算子与框架输出、梯度的一致性，再用框架算子运行较长训练。
+- 残差两支相加前必须具有相同形状；通道数或步长变化时，通过投影分支对齐。
+- 为32×32图像调整ResNet18时，检查首层卷积和下采样设置。
 
 ## 测试
 
+从仓库根目录运行：
+
 ```bash
-python -m pytest pytorch/tests/test_chap5.py -v
+python -m pytest pytorch/tests/test_chap5.py -q
 ```

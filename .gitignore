@@ -6,6 +6,7 @@ __pycache__/
 *.pyc
 *.pyo
 .pytest_cache/
+.outputs/
 
 # Notebook runtime artifacts
 pytorch/**/models/
@@ -25,6 +26,8 @@ pytorch/datasets/bert-base-chinese/
 pytorch/datasets/boston_house_prices.csv
 pytorch/datasets/*.tar.gz
 pytorch/datasets/_*_extract/
+pytorch/datasets/_*_prepare_*/
+pytorch/datasets/**/*.part
 
 # Local notebook migration/runtime scratch
 pytorch/**/scripts/_tmp/

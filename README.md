@@ -21,7 +21,7 @@
 
 ## 快速开始
 
-环境要求：64 位 Python 3.11+、PyTorch 2.7+。所有 Notebook 都可在 CPU 上运行，第 5 章和第 10 章使用 GPU 会更快。
+环境要求：64 位 Python 3.11+、PyTorch 2.7+。Notebook 默认使用 CPU；第 5、6、8、9、10 章包含较长训练，先按各章说明选择短程配置。
 
 ```bash
 git clone https://github.com/nndl/nndl-practice.git
@@ -39,16 +39,21 @@ source .venv/bin/activate
 .venv\Scripts\Activate.ps1
 ```
 
-安装 CPU 版本并打开第一个 Notebook：
+安装 CPU 版本（Windows / Linux）：
 
 ```bash
 python -m pip install --upgrade pip
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
-pip install -r pytorch/requirements.txt
-jupyter notebook "pytorch/chap1实践基础/实践基础.ipynb"
+python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
 ```
 
-使用 NVIDIA GPU 时，请按 [PyTorch 官方安装页](https://pytorch.org/get-started/)选择与本机 CUDA 环境匹配的安装命令。
+macOS 或 NVIDIA GPU 用户请按 [PyTorch 官方安装页](https://pytorch.org/get-started/locally/)选择对应平台的安装命令。随后安装其余依赖并打开第一个 Notebook：
+
+```bash
+python -m pip install -r pytorch/requirements.txt
+python -m jupyter notebook "pytorch/chap1实践基础/实践基础.ipynb"
+```
+
+第 1 章无需下载数据。第 6、8 章运行前需先准备 IMDB / LCQMC，命令与各章缓存位置见 [数据准备说明](pytorch/README.md#数据准备)。
 
 ## 先从哪里开始
 
@@ -85,7 +90,7 @@ jupyter notebook "pytorch/chap1实践基础/实践基础.ipynb"
 | 组件 | 学习重点 |
 |---|---|
 | `RunnerV1` | 闭式求解、评价、预测与参数保存 |
-| `RunnerV2` | 梯度训练、验证集评价与早停法 |
+| `RunnerV2` | 梯度训练、验证集评价与最优模型保存 |
 | `RunnerV3` | `DataLoader`、`state_dict`、指标解耦与训练历史 |
 | `nndl` 算子与模型 | 从基础算子、损失函数和优化器，逐步扩展到 CNN、RNN 与注意力机制 |
 

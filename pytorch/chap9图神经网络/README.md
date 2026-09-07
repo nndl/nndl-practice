@@ -1,24 +1,31 @@
-# chap9 图神经网络（PyTorch）
+# 第9章 图神经网络
 
-| Notebook | 内容 |
-|---|---|
-| [`图神经网络.ipynb`](图神经网络.ipynb) | 从零纯 PyTorch 实现 GCN / GraphSAGE / GAT / GIN；Zachary's Karate Club 上 4 种 GNN 半监督节点分类对比；图级任务玩具数据集（分子图回归）；PyTorch Geometric 等价写法 |
+[图神经网络.ipynb](图神经网络.ipynb)从Karate Club的节点分类出发，依次学习GCN、GraphSAGE、GAT、GIN，再扩展到链接预测、随机图回归、Cora节点分类和PROTEINS图分类。
 
-本章依赖 `networkx` 和 `torch-geometric`，二者已列入 [`../requirements.txt`](../requirements.txt)。按项目安装说明执行 `pip install -r pytorch/requirements.txt` 后即可运行全部单元格。
+基础部分依赖PyTorch、NumPy、NetworkX、Matplotlib和scikit-learn；Cora与PROTEINS实验还需要torch-geometric。依赖已列入[requirements.txt](../requirements.txt)。从本目录顺序运行，PyG首次下载数据后缓存在本章的 `data/` 中。
+
+## 实验条件
+
+- Karate Club：34个节点，以2个节点标签训练，评价其余32个节点；各模型运行5个种子、每个200回合。
+- 链接预测：训练/验证/测试正边分为48/15/15条，按验证AUC选择快照；检查传消息的图和监督边之间的边界。
+- 随机图回归：训练50回合，用于理解图级读出，不是分子数据集。
+- Cora：采用公开标签划分，各模型训练200回合，只用验证标签选择回合。
+- PROTEINS：按图分层划分，训练100回合；包含批图读出、验证选择、最终测试、混淆矩阵和ROC。
+
+Notebook默认执行以上教学配置。运行时间随设备变化，修改回合数后应同时注明实验预算。
 
 ## 实现要点
 
-- **消息传递抽象**：所有 GNN 共享 `message → aggregate → update` 三步。`MessagePassing` 抽象基类把这三步独立出来，子类只重写需要的部分（mean aggregator 演示在基类上的最小实现）。
-- **GCN 归一化**：$\tilde{D}^{-1/2}\tilde{A}\tilde{D}^{-1/2}$ 一次性算好缓存——$\tilde{A} = A + I$ 加自环避免每层都丢失自身信息。手写时小心：每层都要用归一化邻接矩阵相乘，不是只乘一次。
-- **GraphSAGE**：写成针对单节点 $i$ 的聚合形式（`CONCAT(h_i, AGG(neighbors))` 后过 `W`），支持邻居采样。`AGG` 可换 mean / sum / max / LSTM。
-- **GAT 注意力 + 邻居 mask**：先算所有 pair 的 $\alpha_{ij}$，再用邻接矩阵的 0 位置填 `-inf` 让 softmax 自然忽略非邻居。多头是 $K$ 套独立 $(W, \boldsymbol{a})$ 并行算，最后 concat 或平均。
-- **GIN 用 sum 而非 mean**：mean 聚合会损失邻居数量信息（区分不了 $\{a\}$ 和 $\{a, a\}$），GIN 改用 sum 保证单射；再过 MLP（多层 ReLU）拟合任意单射函数。$\epsilon$ 可学习时调整中心节点自身贡献。
-- **节点级 vs 图级任务**：节点分类直接拿每个节点的最终隐藏向量过 softmax；图级任务（分子图回归）需要 **readout**——把所有节点的表示 sum / mean / max 聚合成单个图级向量。GIN 论文推荐拼接每层的 readout，让不同深度的子结构信息都参与。
-- **半监督设定**：Karate Club 只有 2 个标签节点（教练 Mr. Hi 和管理员 Officer），其余 32 个全部 unlabeled。loss 只在标注节点上计算，但 forward 全图同时传消息——这正是 GNN 半监督的关键。
-- **PyG 等价写法**：实际项目用 [PyTorch Geometric](https://pytorch-geometric.readthedocs.io/)，`edge_index` 稀疏表示比稠密邻接矩阵省显存。本章手写版本作为"学具"，理解原理后切到 `GCNConv` / `SAGEConv` / `GATConv` / `GINConv` 一行替换即可。
+- 检查邻接矩阵与边表的方向约定，以及自环、度归一化和偏置的放置。
+- GraphSAGE的均值聚合示例与邻居采样是两件事；本章稠密实现没有因此自动获得大图采样能力。
+- GAT的邻居掩码决定每个节点可关注的位置；GIN通过求和保留邻居重复次数的信息，配合MLP完成更新。
+- 节点分类逐节点输出；图分类或回归需要按图汇聚，组批时不能混合不同图的节点。
+- 切换PyG实现时逐项对照算子约定、图划分和实验设置，不能仅替换类名就认定实验等价。
 
 ## 测试
 
+从仓库根目录运行：
+
 ```bash
-python -m pytest pytorch/tests/test_chap9.py -v
+python -m pytest pytorch/tests/test_chap9.py -q
 ```

@@ -1,276 +1,276 @@
-"""下载本书各章节所需的数据集到本地。
+"""准备第5、6、8章的数据，默认下载CIFAR-10、IMDB、LCQMC和BERT字表。
 
-每次运行会跳过已存在的文件（按目标路径判断），可以反复运行。
-
-数据放在本脚本所在的 pytorch/datasets/ 下，各章 notebook 用相对路径 ../datasets/... 访问：
-  pytorch/datasets/boston_house_prices.csv          — chap2
-  pytorch/datasets/cifar-10-batches-py/             — chap5
-  pytorch/datasets/imdb/{train,dev,test,vocab}.txt.gz  — chap6 / chap8（共享）
-  pytorch/datasets/lcqmc/{train,dev,test}.txt.gz    — chap8
-  pytorch/datasets/bert-base-chinese/vocab.txt      — chap8（LCQMC Transformer 精确复刻，可选）
-
-MNIST 不在此处下载——`torchvision.datasets.MNIST(download=True)` 会自动下载。
-Iris 通过 `sklearn.datasets.load_iris()` 直接取，无需下载。
-
-用法（在仓库根目录 nndl-practice 下）：
-  python pytorch/datasets/download.py
-  python pytorch/datasets/download.py --only=lcqmc,bert_vocab   # 只下载指定数据集
+在仓库根运行：python pytorch/datasets/download.py --only=imdb,lcqmc
+数据写到本脚本所在目录。完整文件会跳过；缺失或损坏的gzip文件会重新准备。
+第2章加州房价由sklearn获取；旧Boston接口仅保留供显式调用。
 """
 import argparse
+from collections import Counter
 import gzip
-import os
+import io
+from pathlib import Path, PurePosixPath
 import random
 import re
 import shutil
 import sys
 import tarfile
+from tempfile import TemporaryDirectory
 import urllib.request
-from collections import Counter
-from pathlib import Path
+import zlib
 
-DATASET_ROOT = Path(__file__).resolve().parent      # nndl-practice/pytorch/datasets（脚本所在目录）
-ROOT = DATASET_ROOT.parents[1]                       # nndl-practice（仅用于日志相对路径）
-CIFAR_DIR = DATASET_ROOT  # cifar-10-batches-py/ 直接落在 datasets/ 下
+
+DATASET_ROOT = Path(__file__).resolve().parent
+ROOT = DATASET_ROOT.parents[1]
+CIFAR_DIR = DATASET_ROOT
 IMDB_DIR = DATASET_ROOT / "imdb"
 LCQMC_DIR = DATASET_ROOT / "lcqmc"
+IMDB_SPLIT_SIZE = 25000
+IMDB_DEV_SIZE = 5000
 
 SOURCES = {
     "boston": "https://raw.githubusercontent.com/selva86/datasets/master/BostonHousing.csv",
     "cifar10": "https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz",
     "imdb": "https://ai.stanford.edu/~amaas/data/sentiment/aclImdb_v1.tar.gz",
     "lcqmc": "https://bj.bcebos.com/paddlehub-dataset/lcqmc.tar.gz",
-    # BERT 中文 vocab.txt（21128）——chap8 LCQMC Transformer 精确复刻用；ModelScope 国内可达
     "bert_vocab": "https://modelscope.cn/api/v1/models/tiansz/bert-base-chinese/repo?Revision=master&FilePath=vocab.txt",
 }
+DEFAULT_DATASETS = ("cifar10", "imdb", "lcqmc", "bert_vocab")
 
 
 def log(msg):
     print(f"[download] {msg}", flush=True)
 
 
-def _download(url: str, dest: Path):
-    if dest.exists():
+def _nonempty(path):
+    return path.is_file() and path.stat().st_size > 0
+
+
+def _gzip_ready(folder, names):
+    """检查全部必需文件，并读到gzip尾部验证CRC，识别上次中断的产物。"""
+    for name in names:
+        path = folder / f"{name}.txt.gz"
+        if not _nonempty(path):
+            return False
+        try:
+            with gzip.open(path, "rb") as stream:
+                if not stream.read(1):
+                    return False
+                while stream.read(1024 * 1024):
+                    pass
+        except (OSError, EOFError, zlib.error):
+            return False
+    return True
+
+
+def _download(url, dest):
+    if _nonempty(dest):
         log(f"skip (exists): {dest.relative_to(ROOT)}")
         return
     dest.parent.mkdir(parents=True, exist_ok=True)
-    tmp = dest.with_suffix(dest.suffix + ".part")
-    log(f"GET {url}")
-    log(f"  -> {dest.relative_to(ROOT)}")
+    tmp = dest.with_name(dest.name + ".part")
+    log(f"GET {url}\n  -> {dest.relative_to(ROOT)}")
 
     def hook(blocks, block_size, total_size):
         if total_size > 0:
-            done = blocks * block_size
-            pct = min(100, done * 100 // total_size)
-            mb_done = done / (1024 * 1024)
-            mb_total = total_size / (1024 * 1024)
-            sys.stdout.write(f"\r  {pct}% ({mb_done:.1f}/{mb_total:.1f} MB)")
+            done = min(blocks * block_size, total_size)
+            sys.stdout.write(f"\r  {done * 100 // total_size}% "
+                             f"({done / 1024**2:.1f}/{total_size / 1024**2:.1f} MB)")
             sys.stdout.flush()
 
-    urllib.request.urlretrieve(url, tmp, reporthook=hook)
-    print()
-    tmp.replace(dest)
+    try:
+        urllib.request.urlretrieve(url, tmp, reporthook=hook)
+        if not _nonempty(tmp):
+            raise ValueError(f"empty download: {url}")
+        tmp.replace(dest)
+        print()
+    finally:
+        tmp.unlink(missing_ok=True)
 
 
-# ----------------- Boston housing -----------------
+def _regular_members(archive):
+    # 仅读普通文件，绝不按压缩包提供的路径落盘或跟随链接。
+    return {str(PurePosixPath(member.name)): member
+            for member in archive.getmembers() if member.isfile()}
+
+
+def _publish(stage, target, names):
+    target.mkdir(parents=True, exist_ok=True)
+    for name in names:
+        (stage / name).replace(target / name)
+
+
 def fetch_boston():
-    dest = DATASET_ROOT / "boston_house_prices.csv"
-    _download(SOURCES["boston"], dest)
-    # The selva86 CSV uses lowercase column names; chap2 expects boston_house_prices.csv format.
-    # Both work with pandas; no schema rewrite needed.
+    """旧实验兼容入口；当前第2章使用加州房价，默认不下载此文件。"""
+    _download(SOURCES["boston"], DATASET_ROOT / "boston_house_prices.csv")
 
 
-# ----------------- CIFAR-10 -----------------
 def fetch_cifar10():
-    target_dir = CIFAR_DIR / "cifar-10-batches-py"
-    if target_dir.exists() and any(target_dir.iterdir()):
-        log(f"skip (exists): {target_dir.relative_to(ROOT)}")
+    target = CIFAR_DIR / "cifar-10-batches-py"
+    names = [f"data_batch_{i}" for i in range(1, 6)] + ["test_batch", "batches.meta"]
+    if all(_nonempty(target / name) for name in names):
+        log(f"skip (complete): {target.relative_to(ROOT)}")
         return
     tar_path = DATASET_ROOT / "cifar-10-python.tar.gz"
     _download(SOURCES["cifar10"], tar_path)
-    log(f"extracting CIFAR-10 -> {CIFAR_DIR.relative_to(ROOT)}")
-    CIFAR_DIR.mkdir(parents=True, exist_ok=True)
-    with tarfile.open(tar_path, "r:gz") as tf:
-        tf.extractall(CIFAR_DIR)
-    # remove the tarball; pickled batches under cifar-10-batches-py/ are the consumed data
+    with TemporaryDirectory(prefix="_cifar_prepare_", dir=DATASET_ROOT) as temp:
+        stage = Path(temp)
+        with tarfile.open(tar_path, "r:gz") as archive:
+            members = _regular_members(archive)
+            for name in names:
+                member = members.get(f"cifar-10-batches-py/{name}")
+                if member is None or member.size == 0:
+                    raise ValueError(f"CIFAR-10 archive missing nonempty {name}")
+                with archive.extractfile(member) as src, (stage / name).open("wb") as dst:
+                    shutil.copyfileobj(src, dst)
+        _publish(stage, target, names)
     tar_path.unlink(missing_ok=True)
     log("CIFAR-10 ready")
 
 
-# ----------------- IMDB -----------------
 def fetch_imdb():
-    # Already processed?
-    if (IMDB_DIR / "train.txt.gz").exists():
-        log(f"skip (exists): {(IMDB_DIR / 'train.txt.gz').relative_to(ROOT)}")
+    splits = ("train", "dev", "test", "vocab")
+    if _gzip_ready(IMDB_DIR, splits):
+        log(f"skip (complete): {IMDB_DIR.relative_to(ROOT)}")
         return
-
     tar_path = DATASET_ROOT / "aclImdb_v1.tar.gz"
-    extract_dir = DATASET_ROOT / "_aclImdb_extract"
     _download(SOURCES["imdb"], tar_path)
-
-    if not extract_dir.exists():
-        log("extracting aclImdb (this takes a minute, ~50k small files)...")
-        extract_dir.mkdir(parents=True, exist_ok=True)
-        with tarfile.open(tar_path, "r:gz") as tf:
-            tf.extractall(extract_dir)
-        log("aclImdb extracted")
-
-    log("processing IMDB into train/dev/test.txt + vocab.txt")
-    aclImdb = extract_dir / "aclImdb"
+    # 直接从压缩包读取影评，避免解压数万个小文件和误用未解压完的目录。
+    reviews = {(split, label): {} for split in ("train", "test") for label in ("pos", "neg")}
+    # gzip只能高效顺序解压。先依包内顺序读取，再按文件名排序以保持原来的划分。
+    with tarfile.open(tar_path, "r|gz") as archive:
+        for member in archive:
+            parts = PurePosixPath(member.name).parts
+            if (not member.isfile() or len(parts) != 4 or parts[0] != "aclImdb"
+                    or (parts[1], parts[2]) not in reviews or not parts[3].endswith(".txt")):
+                continue
+            group = reviews[parts[1], parts[2]]
+            if parts[3] in group:
+                raise ValueError(f"IMDB duplicate review: {member.name}")
+            with archive.extractfile(member) as stream:
+                text = stream.read().decode("utf-8")
+            text = re.sub(r"\s+", " ", text.replace("<br />", " ")).strip().lower()
+            if not text:
+                raise ValueError(f"IMDB empty review: {member.name}")
+            group[parts[3]] = text
 
     def collect(split):
         items = []
-        for label, label_dir in [("1", "pos"), ("0", "neg")]:
-            d = aclImdb / split / label_dir
-            for fp in sorted(d.glob("*.txt")):
-                text = fp.read_text(encoding="utf-8", errors="ignore")
-                # crude cleanup: <br /> -> space, drop control chars
-                text = text.replace("<br />", " ")
-                text = re.sub(r"\s+", " ", text).strip().lower()
-                items.append((label, text))
+        for label, label_dir in (("1", "pos"), ("0", "neg")):
+            group = reviews[split, label_dir]
+            if len(group) != IMDB_SPLIT_SIZE // 2:
+                raise ValueError(f"IMDB {split}/{label_dir}: expected "
+                                 f"{IMDB_SPLIT_SIZE // 2} reviews, got {len(group)}")
+            items.extend((label, group[name]) for name in sorted(group))
         return items
 
-    train_all = collect("train")  # 25k
-    test_items = collect("test")  # 25k
+    train_all, test_items = collect("train"), collect("test")
 
-    rng = random.Random(42)
-    rng.shuffle(train_all)
-    dev_size = 5000
-    dev_items = train_all[:dev_size]
-    train_items = train_all[dev_size:]
+    random.Random(42).shuffle(train_all)
+    dev_items, train_items = train_all[:IMDB_DEV_SIZE], train_all[IMDB_DEV_SIZE:]
+    counter = Counter(word for _, text in train_items for word in text.split())
+    vocab_tokens = ["[PAD]", "[UNK]"] + [word for word, _ in counter.most_common(50000)]
 
-    def write_split(items, path):
-        # gzip-compressed text file
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with gzip.open(path, "wt", encoding="utf-8") as fw:
-            for label, text in items:
-                fw.write(f"{label}\t{text}\n")
-
-    # Build vocab from train (top 50k words by frequency, plus special tokens)
-    counter = Counter()
-    for _, text in train_items:
-        counter.update(text.split(" "))
-    vocab_tokens = ["[PAD]", "[UNK]"] + [w for w, _ in counter.most_common(50000) if w]
-
-    write_split(train_items, IMDB_DIR / "train.txt.gz")
-    write_split(dev_items, IMDB_DIR / "dev.txt.gz")
-    write_split(test_items, IMDB_DIR / "test.txt.gz")
-    vocab_path = IMDB_DIR / "vocab.txt.gz"
-    vocab_path.parent.mkdir(parents=True, exist_ok=True)
-    with gzip.open(vocab_path, "wt", encoding="utf-8") as fw:
-        for tok in vocab_tokens:
-            fw.write(tok + "\n")
-    log(f"  written: {IMDB_DIR.relative_to(ROOT)} (*.txt.gz)")
-
-    # Clean up extracted folder and tarball to save disk
-    log("cleaning up extracted aclImdb and aclImdb_v1.tar.gz...")
-    shutil.rmtree(extract_dir, ignore_errors=True)
+    with TemporaryDirectory(prefix="_imdb_prepare_", dir=DATASET_ROOT) as temp:
+        stage = Path(temp)
+        for name, items in (("train", train_items), ("dev", dev_items), ("test", test_items)):
+            with gzip.open(stage / f"{name}.txt.gz", "wt", encoding="utf-8") as stream:
+                for label, text in items:
+                    stream.write(f"{label}\t{text}\n")
+        with gzip.open(stage / "vocab.txt.gz", "wt", encoding="utf-8") as stream:
+            stream.write("\n".join(vocab_tokens) + "\n")
+        _publish(stage, IMDB_DIR, [f"{name}.txt.gz" for name in splits])
     tar_path.unlink(missing_ok=True)
     log("IMDB ready")
 
 
-# ----------------- LCQMC -----------------
 def fetch_lcqmc():
-    target_dir = LCQMC_DIR
-    train_path = target_dir / "train.txt.gz"
-    if train_path.exists():
-        log(f"skip (exists): {train_path.relative_to(ROOT)}")
+    splits = ("train", "dev", "test")
+    if _gzip_ready(LCQMC_DIR, splits):
+        log(f"skip (complete): {LCQMC_DIR.relative_to(ROOT)}")
         return
     tar_path = DATASET_ROOT / "lcqmc.tar.gz"
-    extract_dir = DATASET_ROOT / "_lcqmc_extract"
     _download(SOURCES["lcqmc"], tar_path)
-
-    log("extracting LCQMC")
-    if extract_dir.exists():
-        shutil.rmtree(extract_dir)
-    extract_dir.mkdir(parents=True, exist_ok=True)
-    with tarfile.open(tar_path, "r:gz") as tf:
-        tf.extractall(extract_dir)
-
-    # paddle hub's tar typically contains lcqmc/{train,dev,test}.tsv with header
-    # Find the actual layout and normalize to chap8 expected format.
-    candidates = list(extract_dir.rglob("train.*"))
-    log(f"  LCQMC extracted entries: {[p.relative_to(extract_dir) for p in candidates]}")
-    src_dir = candidates[0].parent if candidates else None
-    if src_dir is None:
-        raise RuntimeError("LCQMC tar didn't produce a train.* file")
-
-    target_dir.mkdir(parents=True, exist_ok=True)
-
-    def copy_normalize(src: Path, dst: Path):
-        # write gzip-compressed
-        with src.open("r", encoding="utf-8") as fr, gzip.open(dst, "wt", encoding="utf-8") as fw:
-            for i, line in enumerate(fr):
-                # paddle hub format: text_a\ttext_b\tlabel  (with possible header on line 0)
-                parts = line.rstrip("\n").split("\t")
-                if i == 0 and not (parts and parts[-1].isdigit()):
-                    continue  # header line
-                fw.write(line if line.endswith("\n") else line + "\n")
-
-    for split in ("train", "dev", "test"):
-        src = src_dir / f"{split}.tsv"
-        if not src.exists():
-            src = src_dir / f"{split}.txt"
-        if not src.exists():
-            log(f"  warning: {split} file not found in {src_dir}")
-            continue
-        copy_normalize(src, target_dir / f"{split}.txt.gz")
-        log(f"  written: {(target_dir / f'{split}.txt.gz').relative_to(ROOT)}")
-
-    shutil.rmtree(extract_dir, ignore_errors=True)
+    with TemporaryDirectory(prefix="_lcqmc_prepare_", dir=DATASET_ROOT) as temp:
+        stage = Path(temp)
+        with tarfile.open(tar_path, "r:gz") as archive:
+            members = _regular_members(archive)
+            parents = {PurePosixPath(name).parent for name in members
+                       if PurePosixPath(name).name in ("train.tsv", "train.txt")}
+            if len(parents) != 1:
+                raise ValueError("LCQMC archive must contain exactly one train.tsv/train.txt directory")
+            parent = parents.pop()
+            for split in splits:
+                member = next((members[str(parent / f"{split}.{ext}")]
+                               for ext in ("tsv", "txt")
+                               if str(parent / f"{split}.{ext}") in members), None)
+                if member is None:
+                    raise ValueError(f"LCQMC archive missing {split}.tsv/.txt")
+                rows = 0
+                with archive.extractfile(member) as raw, \
+                        io.TextIOWrapper(raw, encoding="utf-8-sig") as src, \
+                        gzip.open(stage / f"{split}.txt.gz", "wt", encoding="utf-8") as dst:
+                    for line_number, line in enumerate(src, 1):
+                        parts = line.rstrip("\r\n").split("\t")
+                        if line_number == 1 and len(parts) == 3 and parts[-1].lower() == "label":
+                            continue
+                        if len(parts) != 3 or not parts[0].strip() or not parts[1].strip() or parts[2] not in ("0", "1"):
+                            raise ValueError(f"LCQMC {split}:{line_number}: expected text_a, text_b, label (0/1)")
+                        dst.write("\t".join(parts) + "\n")
+                        rows += 1
+                if rows == 0:
+                    raise ValueError(f"LCQMC {split}: no examples")
+        _publish(stage, LCQMC_DIR, [f"{split}.txt.gz" for split in splits])
     tar_path.unlink(missing_ok=True)
     log("LCQMC ready")
 
 
-# ----------------- BERT 中文 vocab.txt（LCQMC Transformer 精确复刻，可选）-----------------
-def fetch_bert_vocab():
-    """下载 bert-base-chinese vocab.txt 供 chap8 LCQMC Transformer 精确复刻。
-    非致命：缺它时 rerun_lcqmc_transformer.py 会自动退回字符级词表。"""
-    dest = DATASET_ROOT / "bert-base-chinese" / "vocab.txt"
-    if dest.exists():
-        log(f"skip (exists): {dest.relative_to(ROOT)}")
-        return
+def _valid_bert_vocab(path):
+    if not _nonempty(path):
+        return False
     try:
-        _download(SOURCES["bert_vocab"], dest)
-        lines = dest.read_text(encoding="utf-8").splitlines()
-        if len(lines) < 21000 or "[CLS]" not in lines:
-            raise RuntimeError(f"校验失败（lines={len(lines)}）")
-        log(f"BERT 中文 vocab.txt ready ({len(lines)} 行)")
-    except Exception as e:
-        dest.unlink(missing_ok=True)
-        log(f"  warning: bert_vocab 获取失败（{type(e).__name__}: {e}）—— "
-            f"可手动放到 {dest.relative_to(ROOT)}；缺它 LCQMC 脚本退回字符级词表")
+        # 字表包含U+2028及其WordPiece形式；splitlines()会把词元误拆成多行。
+        with path.open(encoding="utf-8") as stream:
+            words = [line.rstrip("\n") for line in stream]
+    except UnicodeError:
+        return False
+    return (len(words) == 21128 and len(set(words)) == len(words)
+            and words[0] == "[PAD]" and words[100:104] == ["[UNK]", "[CLS]", "[SEP]", "[MASK]"])
 
 
-# ----------------- main -----------------
+def fetch_bert_vocab():
+    """字符级实验使用固定字表；不包含模型权重或WordPiece分词器。"""
+    dest = DATASET_ROOT / "bert-base-chinese" / "vocab.txt"
+    if _valid_bert_vocab(dest):
+        log(f"skip (complete): {dest.relative_to(ROOT)}")
+        return
+    with TemporaryDirectory(prefix="_bert_prepare_", dir=DATASET_ROOT) as temp:
+        candidate = Path(temp) / "vocab.txt"
+        _download(SOURCES["bert_vocab"], candidate)
+        if not _valid_bert_vocab(candidate):
+            raise ValueError("BERT vocabulary validation failed: expected 21128 unique tokens and standard special-token IDs")
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        candidate.replace(dest)
+    log("BERT Chinese vocabulary ready (21128 tokens)")
+
+
 FETCHERS = {
-    "boston": fetch_boston,
-    "cifar10": fetch_cifar10,
-    "imdb": fetch_imdb,
-    "lcqmc": fetch_lcqmc,
-    "bert_vocab": fetch_bert_vocab,
+    "boston": fetch_boston, "cifar10": fetch_cifar10, "imdb": fetch_imdb,
+    "lcqmc": fetch_lcqmc, "bert_vocab": fetch_bert_vocab,
 }
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--only",
-        default="",
-        help="comma-separated subset, e.g. boston,lcqmc",
-    )
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--only", default="", help="comma-separated subset: " + ",".join(FETCHERS))
     args = parser.parse_args()
+    selected = list(dict.fromkeys(k.strip() for k in args.only.split(",") if k.strip())) or list(DEFAULT_DATASETS)
+    unknown = [name for name in selected if name not in FETCHERS]
+    if unknown:
+        parser.error(f"unknown dataset(s): {', '.join(unknown)}; valid: {', '.join(FETCHERS)}")
     DATASET_ROOT.mkdir(exist_ok=True)
-    selected = [k.strip() for k in args.only.split(",") if k.strip()] or list(FETCHERS.keys())
     for name in selected:
-        if name not in FETCHERS:
-            log(f"unknown dataset '{name}', skipping (valid: {list(FETCHERS.keys())})")
-            continue
         log(f"=== {name} ===")
-        try:
-            FETCHERS[name]()
-        except Exception as e:
-            log(f"  ERROR for {name}: {type(e).__name__}: {e}")
-            raise
+        FETCHERS[name]()
     log("all done")
 
 
